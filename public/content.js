@@ -1,5 +1,5 @@
 // Enhanced YouTube extension with secure backend integration
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = 'https://your-backend-domain.com/api'; // UPDATE THIS FOR PRODUCTION
 
 function injectSummarizationPanel() {
   // Check if we're on a YouTube video page

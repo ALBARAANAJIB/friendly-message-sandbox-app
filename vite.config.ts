@@ -1,22 +1,23 @@
 
 import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
 import path from "path";
-import { componentTagger } from "lovable-tagger";
 
-// https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
-  server: {
-    host: "::",
-    port: 8080,
-  },
-  plugins: [
-    react(),
-    mode === 'development' && componentTagger(),
-  ].filter(Boolean),
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
+export default defineConfig({
+  build: {
+    rollupOptions: {
+      input: {
+        popup: path.resolve(__dirname, 'public/popup.html'),
+        background: path.resolve(__dirname, 'public/background.js'),
+        content: path.resolve(__dirname, 'public/content.js'),
+      },
+      output: {
+        entryFileNames: '[name].js',
+        chunkFileNames: '[name].js',
+        assetFileNames: '[name].[ext]'
+      }
     },
+    outDir: 'dist',
+    emptyOutDir: true,
   },
-}));
+  publicDir: 'public'
+});
