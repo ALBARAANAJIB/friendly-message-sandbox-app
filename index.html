@@ -62,39 +62,22 @@
       margin-right: 0.5rem;
       margin-left: -1rem;
     }
-    .chrome-store {
-      background: #dc2626;
-      color: white;
-      padding: 12px 24px;
-      border-radius: 8px;
-      text-decoration: none;
-      display: inline-block;
-      margin-top: 1.5rem;
-      font-weight: 500;
-      transition: background-color 0.2s;
-    }
-    .chrome-store:hover {
-      background: #b91c1c;
-    }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>YouTube Enhancer</h1>
-    <p>A powerful Chrome extension that enhances your YouTube experience with AI-powered video summarization and comprehensive liked video management.</p>
+    <h1>YouTube Enhancer Extension</h1>
+    <p>This is a Chrome extension project. Load the `public/` folder as an unpacked extension in Chrome to test it.</p>
     
     <div class="features">
-      <h2>Extension Features</h2>
+      <h2>How to Test</h2>
       <ul>
-        <li>AI-powered video summarization using Google Gemini</li>
-        <li>Complete liked videos management and export</li>
-        <li>Secure YouTube API integration</li>
-        <li>Clean, professional interface</li>
-        <li>Fast and lightweight</li>
+        <li>Open Chrome → Extensions → Developer Mode ON</li>
+        <li>Click "Load unpacked" → Select your `public/` folder</li>
+        <li>Go to YouTube video → Click summarize button</li>
+        <li>Update API_BASE_URL in content.js to your backend</li>
       </ul>
     </div>
-    
-    <a href="#" class="chrome-store">Available on Chrome Web Store (Coming Soon)</a>
   </div>
 </body>
 </html>

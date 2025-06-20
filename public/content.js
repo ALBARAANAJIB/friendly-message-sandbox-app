@@ -1,5 +1,16 @@
 // Enhanced YouTube extension with secure backend integration
-const API_BASE_URL = 'https://your-backend-domain.com/api'; // UPDATE THIS FOR PRODUCTION
+
+// 🔥 IMPORTANT: UPDATE THIS URL TO YOUR DEPLOYED BACKEND 🔥
+// If your backend is deployed on Railway/Render/Heroku at https://your-app.railway.app
+// Change the line below to: const API_BASE_URL = 'https://your-app.railway.app/api';
+// 
+// Example deployed URLs:
+// Railway: https://your-backend-name.railway.app/api
+// Render: https://your-backend-name.onrender.com/api  
+// Heroku: https://your-backend-name.herokuapp.com/api
+//
+// Replace 'your-backend-name' with your actual deployment URL
+const API_BASE_URL = 'https://your-backend-domain.com/api'; // 👈 CHANGE THIS LINE
 
 function injectSummarizationPanel() {
   // Check if we're on a YouTube video page
