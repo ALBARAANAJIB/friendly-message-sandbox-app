@@ -44,6 +44,6 @@
   "host_permissions": [
     "*://*.youtube.com/*",
     "*://*.googleapis.com/*",
-    "https://your-backend-domain.com/*"
+    "https://localhost:3000/*"
   ]
 }

@@ -3,9 +3,7 @@ const CLIENT_ID = '304162096302-4mpo9949jogs1ptnpmc0s4ipkq53dbsm.apps.googleuser
 const REDIRECT_URL = chrome.identity.getRedirectURL();
 const SCOPES = [
   'https://www.googleapis.com/auth/youtube.readonly',
-  'https://www.googleapis.com/auth/youtube.force-ssl',
-  'https://www.googleapis.com/auth/userinfo.profile',
-  'https://www.googleapis.com/auth/userinfo.email'
+  'https://www.googleapis.com/auth/youtube.force-ssl'
 ];
 
 // YouTube API endpoints
@@ -28,6 +26,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'authenticate') {
     (async () => {
       try {
+        console.log('Starting authentication with client ID:', CLIENT_ID);
+        console.log('Redirect URL:', REDIRECT_URL);
+        console.log('Requested scopes:', SCOPES);
+        
         const token = await authenticate();
         const userInfo = await getUserInfo(token);
         await chrome.storage.local.set({ userToken: token, userInfo: userInfo });
@@ -37,7 +39,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ success: false, error: error.message });
       }
     })();
-    return true; // Keep the message channel open for the async response
+    return true;
   }
   
   // Check authentication status
@@ -51,7 +53,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ authenticated: false });
       }
     });
-    return true; // Keep the message channel open for the async response
+    return true;
   }
 
   // Fetch the user's liked videos
@@ -146,7 +148,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ success: false, error: error.message });
       }
     })();
-    return true; // Keep the message channel open for the async response
+    return true;
   }
 
   // Handle additional videos fetch with pagination
@@ -229,7 +231,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ success: false, error: error.message });
       }
     })();
-    return true; // Keep the message channel open for the async response
+    return true;
   }
 
   // Open the dashboard
@@ -362,7 +364,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ success: false, error: error.message });
       }
     })();
-    return true; // Keep the message channel open for the async response
+    return true;
   }
 
   // Handle video removal from liked list
@@ -399,7 +401,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ success: false, error: error.message });
       }
     })();
-    return true; // Keep the message channel open for the async response
+    return true;
   }
 
   // Extract transcript from page and summarize video
@@ -612,7 +614,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
     })();
     
-    return true; // Keep the message channel open for the async response
+    return true;
   }
 
   // Handle video summarization with transcript fetching
@@ -831,7 +833,7 @@ Format your response in HTML with bullet points using <ul> and <li> tags.`;
         });
       }
     })();
-    return true; // Keep the message channel open for the async response
+    return true;
   }
   
   // Handle saving the AI API key
@@ -846,7 +848,7 @@ Format your response in HTML with bullet points using <ul> and <li> tags.`;
         sendResponse({ success: false, error: error.message });
       }
     })();
-    return true; // Keep the message channel open for the async response
+    return true;
   }
   
   // Handle saving AI model choice
@@ -860,7 +862,7 @@ Format your response in HTML with bullet points using <ul> and <li> tags.`;
         sendResponse({ success: false, error: error.message });
       }
     })();
-    return true; // Keep the message channel open for the async response
+    return true;
   }
 
   // If no handlers above matched, return false to indicate we won't call sendResponse
@@ -1084,27 +1086,32 @@ function processSrtTranscript(srtText) {
   }
 }
 
-// Updated authenticate function using getAuthToken instead of launchWebAuthFlow
+// Updated authenticate function with better error handling
 async function authenticate() {
   return new Promise((resolve, reject) => {
-    // Use Chrome's identity.getAuthToken for Manifest V3
-    chrome.identity.getAuthToken({ 
-      interactive: true,
-      scopes: SCOPES
-    }, (token) => {
-      if (chrome.runtime.lastError) {
-        console.error('Authentication error:', chrome.runtime.lastError);
-        reject(new Error(chrome.runtime.lastError.message));
-        return;
-      }
-      
-      if (!token) {
-        reject(new Error('No access token received'));
-        return;
-      }
-      
-      console.log('Authentication successful');
-      resolve(token);
+    console.log('Attempting to get auth token...');
+    
+    // Clear any existing cached token first
+    chrome.identity.removeCachedAuthToken({ token: '' }, () => {
+      // Use Chrome's identity.getAuthToken for Manifest V3
+      chrome.identity.getAuthToken({ 
+        interactive: true,
+        scopes: SCOPES
+      }, (token) => {
+        if (chrome.runtime.lastError) {
+          console.error('Chrome identity error:', chrome.runtime.lastError);
+          reject(new Error(`Authentication failed: ${chrome.runtime.lastError.message}`));
+          return;
+        }
+        
+        if (!token) {
+          reject(new Error('No access token received from Google'));
+          return;
+        }
+        
+        console.log('Authentication successful, token received');
+        resolve(token);
+      });
     });
   });
 }
