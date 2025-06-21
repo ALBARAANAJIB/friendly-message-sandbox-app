@@ -10,7 +10,7 @@
 // Heroku: https://your-backend-name.herokuapp.com/api
 //
 // Replace 'your-backend-name' with your actual deployment URL
-const API_BASE_URL = 'https://your-backend-domain.com/api'; // 👈 CHANGE THIS LINE
+const API_BASE_URL = 'friendly-message-sandbox-app-production.up.railway.app'; // 👈 CHANGE THIS LINE
 
 function injectSummarizationPanel() {
   // Check if we're on a YouTube video page
