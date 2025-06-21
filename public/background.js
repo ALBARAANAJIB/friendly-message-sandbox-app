@@ -1,3 +1,4 @@
+
 // YouTube Enhancer Background Script with Modern Chrome Authentication
 console.log('🚀 YouTube Enhancer background script loaded');
 
@@ -29,12 +30,19 @@ async function authenticateWithYouTube() {
       throw new Error('Authentication was cancelled or failed');
     }
     
-    console.log('🎟️ Access token received:', token.substring(0, 20) + '...');
+    // Ensure token is a string
+    const accessToken = typeof token === 'string' ? token : token.token || '';
+    
+    if (!accessToken) {
+      throw new Error('No valid access token received');
+    }
+    
+    console.log('🎟️ Access token received:', accessToken.substring(0, 20) + '...');
     
     // Get user info from Google API
     const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
       headers: {
-        'Authorization': `Bearer ${token}`
+        'Authorization': `Bearer ${accessToken}`
       }
     });
     
@@ -47,7 +55,7 @@ async function authenticateWithYouTube() {
     
     // Store authentication data
     await chrome.storage.local.set({
-      userToken: token,
+      userToken: accessToken,
       userInfo: userInfo,
       tokenExpiry: Date.now() + (3600 * 1000) // 1 hour from now
     });

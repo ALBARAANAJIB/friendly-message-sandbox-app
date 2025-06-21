@@ -1,16 +1,9 @@
 // Enhanced YouTube extension with secure backend integration
 
-// 🔥 IMPORTANT: UPDATE THIS URL TO YOUR DEPLOYED BACKEND 🔥
-// If your backend is deployed on Railway/Render/Heroku at https://your-app.railway.app
-// Change the line below to: const API_BASE_URL = 'https://your-app.railway.app/api';
-// 
-// Example deployed URLs:
-// Railway: https://your-backend-name.railway.app/api
-// Render: https://your-backend-name.onrender.com/api  
-// Heroku: https://your-backend-name.herokuapp.com/api
-//
-// Replace 'your-backend-name' with your actual deployment URL
-const API_BASE_URL = 'https://friendly-message-sandbox-app-production.up.railway.app/api'; // 👈 FIXED URL
+// 🔥 IMPORTANT: Backend URL Configuration 🔥
+// For LOCAL DEVELOPMENT: Use 'http://localhost:3000/api'
+// For PRODUCTION: Use your Railway URL 'https://friendly-message-sandbox-app-production.up.railway.app/api'
+const API_BASE_URL = 'http://localhost:3000/api'; // 👈 SET TO LOCAL FOR DEVELOPMENT
 
 function injectSummarizationPanel() {
   // Check if we're on a YouTube video page
@@ -80,7 +73,7 @@ function injectSummarizationPanel() {
           background: #f3f4f6;
           padding: 2px 6px;
           border-radius: 3px;
-        ">Transcript-Based</div>
+        ">Backend: ${API_BASE_URL.includes('localhost') ? 'Local' : 'Railway'}</div>
       </div>
       
       <!-- Content -->
@@ -183,9 +176,10 @@ function injectSummarizationPanel() {
 // Secure backend API call
 async function summarizeVideo(videoUrl, loadingMessage, contentDiv, loadingDiv, summarizeBtn) {
   try {
-    loadingMessage.textContent = 'Fetching video transcript...';
+    loadingMessage.textContent = 'Connecting to backend...';
     
     console.log('🔗 Making API request to backend:', API_BASE_URL);
+    console.log('🎯 Video URL:', videoUrl);
     
     const response = await fetch(`${API_BASE_URL}/summary/youtube`, {
       method: 'POST',
@@ -199,8 +193,21 @@ async function summarizeVideo(videoUrl, loadingMessage, contentDiv, loadingDiv, 
 
     loadingMessage.textContent = 'Processing with AI...';
 
+    console.log('📡 Response status:', response.status);
+    console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}: ${response.statusText}` }));
+      let errorData;
+      const contentType = response.headers.get('content-type');
+      
+      if (contentType && contentType.includes('application/json')) {
+        errorData = await response.json();
+      } else {
+        const textResponse = await response.text();
+        console.error('❌ Non-JSON response:', textResponse);
+        errorData = { error: `Server returned HTML instead of JSON. Status: ${response.status}` };
+      }
+      
       throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
     }
 
@@ -217,7 +224,9 @@ async function summarizeVideo(videoUrl, loadingMessage, contentDiv, loadingDiv, 
     console.error('❌ Backend API error:', error);
     
     if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-      throw new Error('🔌 Backend connection failed. Check if the server is running at: ' + API_BASE_URL);
+      throw new Error(`🔌 Cannot connect to backend at: ${API_BASE_URL}\n\nMake sure your backend is running:\n- Local: npm start in backend folder\n- Railway: Check deployment status`);
+    } else if (error.message.includes('HTML instead of JSON')) {
+      throw new Error(`🏗️ Backend is returning HTML (probably an error page).\n\nCheck:\n- Backend logs for errors\n- Environment variables (GOOGLE_AI_API_KEY)\n- Endpoint URL: ${API_BASE_URL}`);
     } else {
       throw error;
     }
@@ -367,6 +376,8 @@ function showError(contentDiv, loadingDiv, summarizeBtn, errorMessage) {
         line-height: 1.4; 
         color: #991b1b;
         margin-bottom: 12px;
+        white-space: pre-wrap;
+        text-align: left;
       ">${errorMessage}</div>
       <button onclick="document.getElementById('summarize-video-btn').click()" style="
         background: #f9fafb;
