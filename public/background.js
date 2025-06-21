@@ -1,4 +1,4 @@
-// YouTube Enhancer Background Script with Fixed Authentication
+// YouTube Enhancer Background Script with Modern Chrome Authentication
 console.log('🚀 YouTube Enhancer background script loaded');
 
 // Set up extension installation/startup
@@ -8,51 +8,33 @@ chrome.runtime.onInstalled.addListener((details) => {
   }
 });
 
-// Enhanced YouTube OAuth Authentication
+// Modern Chrome Authentication using getAuthToken
 async function authenticateWithYouTube() {
   try {
-    console.log('🔐 Starting YouTube OAuth authentication...');
+    console.log('🔐 Starting YouTube authentication with Chrome Identity API...');
     
     // Clear any existing tokens first
     await chrome.storage.local.remove(['userToken', 'userInfo']);
     
-    const authUrl = new URL('https://accounts.google.com/oauth/authorize');
-    authUrl.searchParams.set('client_id', '304162096302-4mpo9949jogs1ptnpmc0s4ipkq53dbsm.apps.googleusercontent.com');
-    authUrl.searchParams.set('response_type', 'token');
-    authUrl.searchParams.set('redirect_uri', chrome.identity.getRedirectURL());
-    authUrl.searchParams.set('scope', 'https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/youtube.force-ssl');
-    authUrl.searchParams.set('access_type', 'online');
-    
-    console.log('🔗 Auth URL:', authUrl.toString());
-    console.log('🔄 Redirect URI:', chrome.identity.getRedirectURL());
-    
-    const authResult = await chrome.identity.launchWebAuthFlow({
-      url: authUrl.toString(),
-      interactive: true
+    // Use Chrome's built-in authentication
+    const token = await chrome.identity.getAuthToken({
+      interactive: true,
+      scopes: [
+        'https://www.googleapis.com/auth/youtube.readonly',
+        'https://www.googleapis.com/auth/youtube.force-ssl'
+      ]
     });
     
-    console.log('✅ Auth flow completed:', authResult);
-    
-    if (!authResult) {
+    if (!token) {
       throw new Error('Authentication was cancelled or failed');
     }
     
-    // Extract access token from URL fragment
-    const url = new URL(authResult);
-    const fragment = url.hash.substring(1);
-    const params = new URLSearchParams(fragment);
-    const accessToken = params.get('access_token');
+    console.log('🎟️ Access token received:', token.substring(0, 20) + '...');
     
-    if (!accessToken) {
-      throw new Error('No access token received from authentication');
-    }
-    
-    console.log('🎟️ Access token received:', accessToken.substring(0, 20) + '...');
-    
-    // Get user info from YouTube API
+    // Get user info from Google API
     const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
       headers: {
-        'Authorization': `Bearer ${accessToken}`
+        'Authorization': `Bearer ${token}`
       }
     });
     
@@ -65,7 +47,7 @@ async function authenticateWithYouTube() {
     
     // Store authentication data
     await chrome.storage.local.set({
-      userToken: accessToken,
+      userToken: token,
       userInfo: userInfo,
       tokenExpiry: Date.now() + (3600 * 1000) // 1 hour from now
     });

@@ -10,7 +10,7 @@
 // Heroku: https://your-backend-name.herokuapp.com/api
 //
 // Replace 'your-backend-name' with your actual deployment URL
-const API_BASE_URL = 'friendly-message-sandbox-app-production.up.railway.app'; // 👈 CHANGE THIS LINE
+const API_BASE_URL = 'https://friendly-message-sandbox-app-production.up.railway.app/api'; // 👈 FIXED URL
 
 function injectSummarizationPanel() {
   // Check if we're on a YouTube video page
@@ -185,7 +185,7 @@ async function summarizeVideo(videoUrl, loadingMessage, contentDiv, loadingDiv, 
   try {
     loadingMessage.textContent = 'Fetching video transcript...';
     
-    console.log('🔗 Making API request to backend...');
+    console.log('🔗 Making API request to backend:', API_BASE_URL);
     
     const response = await fetch(`${API_BASE_URL}/summary/youtube`, {
       method: 'POST',
@@ -200,7 +200,7 @@ async function summarizeVideo(videoUrl, loadingMessage, contentDiv, loadingDiv, 
     loadingMessage.textContent = 'Processing with AI...';
 
     if (!response.ok) {
-      const errorData = await response.json();
+      const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}: ${response.statusText}` }));
       throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
     }
 
@@ -217,7 +217,7 @@ async function summarizeVideo(videoUrl, loadingMessage, contentDiv, loadingDiv, 
     console.error('❌ Backend API error:', error);
     
     if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-      throw new Error('🔌 Backend connection failed. Make sure the server is running on port 3000.');
+      throw new Error('🔌 Backend connection failed. Check if the server is running at: ' + API_BASE_URL);
     } else {
       throw error;
     }
