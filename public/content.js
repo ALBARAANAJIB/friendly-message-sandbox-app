@@ -108,34 +108,58 @@ if (window.youtubeEnhancerLoaded) {
 // In content.js
 
   // --- NEW SIMPLIFIED Summarization Panel Injection ---
-  async function injectSummarizationPanel() {
-    try {
-      console.log('YouTube Maestro: Starting panel injection...');
-      
-      // --- CHANGE 1: SIMPLIFIED LOGIC ---
-      // We now always remove the old panel to ensure a fresh start on every video.
-      const existingPanel = document.getElementById('youtube-enhancer-panel');
-      if (existingPanel) {
-          console.log('YouTube Maestro: Old panel found. Removing it for a clean re-injection.');
-          existingPanel.remove();
-      }
-      // No more complex "reset" logic. We will always create a new panel.
-  
-      const secondaryColumn = await waitForElement('#secondary-inner');
-      if (!secondaryColumn) {
-        console.log('YouTube Maestro: Secondary column not found.');
-        return;
-      }
-  
-      const panel = document.createElement('div');
-      panel.id = 'youtube-enhancer-panel';
-      // --- CHANGE 2: ADDED THE MISSING HTML FOR THE LANGUAGE SELECTOR ---
-      panel.innerHTML = `
-        <div id="enhancer-container">
-          <div class="enhancer-header">
-            <div class="enhancer-title-group">
-              <h3>AI Summary</h3>
-            </div>
+// In content.js
+
+// --- FINAL, FLASH-PROOF SUMMARIZATION PANEL INJECTION ---
+// In content.js
+
+// --- FINAL, FLASH-PROOF SUMMARIZATION PANEL INJECTION ---
+// In content.js
+
+// --- FINAL, FLASH-PROOF & LAYOUT-FIXED SUMMARIZATION PANEL INJECTION ---
+async function injectSummarizationPanel() {
+  try {
+    console.log('YouTube Maestro: Starting panel injection...');
+    
+    // Always remove the old panel to ensure a clean slate
+    const existingPanel = document.getElementById('youtube-enhancer-panel');
+    if (existingPanel) {
+        existingPanel.remove();
+    }
+
+    // STEP 1: READ THEME SETTING FROM STORAGE FIRST
+    const { summary_theme } = await new Promise(resolve => {
+        chrome.storage.local.get('summary_theme', result => resolve(result));
+    });
+
+    // STEP 2: PRE-CALCULATE THE INITIAL THEME
+    let initialTheme = 'light'; // Default to light
+    if (summary_theme === 'auto' || !summary_theme) {
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            initialTheme = 'dark';
+        }
+    } else {
+        initialTheme = summary_theme;
+    }
+
+    const secondaryColumn = await waitForElement('#secondary-inner');
+    if (!secondaryColumn) {
+      console.log('YouTube Maestro: Secondary column not found.');
+      return;
+    }
+
+    const panel = document.createElement('div');
+    panel.id = 'youtube-enhancer-panel';
+    
+    // STEP 3: BUILD THE HTML WITH THE CORRECT THEME AND THE FIXED LAYOUT
+    panel.innerHTML = `
+      <div id="enhancer-container" data-theme="${initialTheme}">
+        <div class="enhancer-header">
+          <div class="enhancer-title-group">
+            <h3>AI Summary</h3>
+          </div>
+          
+          <div class="settings-wrapper" style="position: relative;">
             <button class="settings-button" id="summary-settings-button">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="3"/>
@@ -145,214 +169,90 @@ if (window.youtubeEnhancerLoaded) {
             <div class="settings-dropdown" id="summary-settings-dropdown">
               <div class="setting-item">
                 <label>Language:</label>
-                <select id="summary-language-select">
-                  <option value="English" selected>English</option>
-                  <option value="Arabic">العربية</option>
-                  <option value="Turkish">Türkçe</option>
-                </select>
+                <select id="summary-language-select"><option value="English" selected>English</option><option value="Arabic">العربية</option><option value="Turkish">Türkçe</option></select>
               </div>
               <div class="setting-item">
                 <label>Theme:</label>
-                <select id="summary-theme-select">
-                  <option value="auto">Auto</option>
-                  <option value="light">Light</option>
-                  <option value="dark">Dark</option>
-                </select>
+                <select id="summary-theme-select"><option value="auto">Auto</option><option value="light">Light</option><option value="dark">Dark</option></select>
               </div>
             </div>
           </div>
-          <div class="enhancer-content-area">
-            <button id="summarize-video-btn">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-color)" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg>
-              <span>Summarize Video</span>
-            </button>
-            <div id="summary-loading" style="display: none;">
-              <div class="enhancer-loader"></div>
-              <div id="loading-message"></div>
-            </div>
-            <div id="summary-content" style="display: none;"></div>
           </div>
+        <div class="enhancer-content-area">
+          <button id="summarize-video-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-color)" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg>
+            <span>Summarize Video</span>
+          </button>
+          <div id="summary-loading" style="display: none;"><div class="enhancer-loader"></div><div id="loading-message"></div></div>
+          <div id="summary-content" style="display: none;"></div>
         </div>
-        <style>
-          :root { --accent-color: #FF0000; }
-          #enhancer-container {
-            --bg-color: #FFFFFF; --text-color: #0f0f0f; --secondary-text-color: #606060;
-            --border-color: #e5e5e5; --button-bg-color: #f2f2f2; --button-hover-bg-color: #e5e5e5;
-            --scrollbar-thumb-color: #CCCCCC; --error-bg-color: #FFF5F5; --error-border-color: #FECACA;
-            --error-text-color: #991B1B; --limit-bg-color: #FFFBEB; --limit-border-color: #FDE68A;
-            --limit-text-color: #92400E;
-          }
-          #enhancer-container[data-theme="dark"] {
-            --bg-color: #212121; --text-color: #f1f1f1; --secondary-text-color: #aaaaaa;
-            --border-color: #3d3d3d; --button-bg-color: #3F3F3F; --button-hover-bg-color: #5A5A5A;
-            --scrollbar-thumb-color: #5A5A5A; --error-bg-color: rgba(153, 27, 27, 0.2);
-            --error-border-color: rgba(153, 27, 27, 0.5); --error-text-color: #FCA5A5;
-            --limit-bg-color: rgba(146, 64, 14, 0.2); --limit-border-color: rgba(146, 64, 14, 0.5);
-            --limit-text-color: #FCD34D;
-          }
-          #enhancer-container { background: var(--bg-color); color: var(--text-color); border-radius: 12px;
-            margin-bottom: 16px; border: 1px solid var(--border-color); font-family: 'Roboto', sans-serif;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); overflow: hidden;
-            transition: background-color 0.3s, color 0.3s, border-color 0.3s; }
-          .enhancer-header { padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); position: relative; }
-          .enhancer-title-group { display: flex; align-items: center; gap: 12px; }
-          .enhancer-header h3 { margin: 0; font-size: 16px; font-weight: 500; color: var(--text-color); }
-          .settings-button { background: none; border: none; color: var(--text-color); cursor: pointer; padding: 4px; border-radius: 4px; transition: background-color 0.2s; }
-          .settings-button:hover { background: var(--button-bg-color); }
-          .settings-dropdown { position: absolute; top: 100%; right: 0; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px; min-width: 150px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 1000; display: none; }
-          .settings-dropdown.show { display: block; }
-          .setting-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-          .setting-item:last-child { margin-bottom: 0; }
-          .setting-item label { font-size: 12px; color: var(--secondary-text-color); font-weight: 500; }
-          .setting-item select { background: var(--button-bg-color); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 4px; padding: 2px 6px; font-size: 11px; }
-          .enhancer-content-area { padding: 16px; }
-          #summarize-video-btn { 
-            width: 100%; background: var(--button-bg-color); color: var(--text-color); border: none;
-            margin-top: 16px; /* Added margin to create space */
-            border-radius: 18px; padding: 10px 16px; font-size: 14px; font-weight: 500; cursor: pointer;
-            transition: background-color 0.2s ease; display: flex; align-items: center; justify-content: center; gap: 8px; 
-          }
-          #summarize-video-btn:hover { background: var(--button-hover-bg-color); }
-          #summary-loading { text-align: center; padding: 16px 0; color: var(--secondary-text-color); }
-          .enhancer-loader { width: 24px; height: 24px; margin: 0 auto 16px; border: 2px solid var(--accent-color);
-            border-bottom-color: transparent; border-radius: 50%; animation: enhancer-rotation 1s linear infinite; }
-          @keyframes enhancer-rotation { 100% { transform: rotate(360deg); } }
-        </style>
-      `;
+      </div>
+      <style>
+        /* CSS for fade-in effect */
+        #youtube-enhancer-panel {
+          opacity: 0;
+          transition: opacity 0.25s ease-in-out;
+        }
+        /* All other styles remain the same */
+        #enhancer-container { --accent-color: #FF0000; --bg-color: #FFFFFF; --text-color: #0f0f0f; --secondary-text-color: #606060; --border-color: #e5e5e5; --button-bg-color: #f2f2f2; --button-hover-bg-color: #e5e5e5; --error-bg-color: #FFF5F5; --error-border-color: #FECACA; --error-text-color: #991B1B; }
+        #enhancer-container[data-theme="dark"] { --bg-color: #212121; --text-color: #f1f1f1; --secondary-text-color: #aaaaaa; --border-color: #3d3d3d; --button-bg-color: #3F3F3F; --button-hover-bg-color: #5A5A5A; --error-bg-color: rgba(153, 27, 27, 0.2); --error-border-color: rgba(153, 27, 27, 0.5); --error-text-color: #FCA5A5; }
+        #enhancer-container { background: var(--bg-color); color: var(--text-color); border-radius: 12px; margin-bottom: 16px; border: 1px solid var(--border-color); font-family: 'Roboto', sans-serif; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); overflow: hidden; transition: all 0.3s; }
+        .enhancer-header { padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); }
+        .enhancer-header h3 { margin: 0; font-size: 16px; font-weight: 500; }
+        .settings-button { background: none; border: none; color: var(--text-color); cursor: pointer; padding: 4px; border-radius: 4px; transition: background-color 0.2s; display: block; }
+        .settings-button:hover { background: var(--button-bg-color); }
+        .settings-dropdown { position: absolute; top: calc(100% + 5px); right: 0; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px; min-width: 150px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 1000; display: none; }
+        .settings-dropdown.show { display: block; }
+        .setting-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .setting-item:last-child { margin-bottom: 0; }
+        .setting-item label { font-size: 12px; color: var(--secondary-text-color); font-weight: 500; }
+        .setting-item select { background: var(--button-bg-color); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 4px; padding: 2px 6px; font-size: 11px; }
+        .enhancer-content-area { padding: 16px; }
+        #summarize-video-btn { width: 100%; background: var(--button-bg-color); color: var(--text-color); border: none; margin-top: 16px; border-radius: 18px; padding: 10px 16px; font-size: 14px; font-weight: 500; cursor: pointer; transition: background-color 0.2s ease; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        #summarize-video-btn:hover { background: var(--button-hover-bg-color); }
+        .enhancer-loader { width: 24px; height: 24px; margin: 0 auto 16px; border: 2px solid var(--accent-color); border-bottom-color: transparent; border-radius: 50%; animation: enhancer-rotation 1s linear infinite; }
+        @keyframes enhancer-rotation { 100% { transform: rotate(360deg); } }
+      </style>
+    `;
+
+    secondaryColumn.insertBefore(panel, secondaryColumn.firstChild);
+    
+    // Trigger the fade-in
+    setTimeout(() => { panel.style.opacity = '1'; }, 10);
+    
+    // SETUP EVENT LISTENERS (this part remains the same)
+    const container = document.getElementById('enhancer-container');
+    const settingsButton = document.getElementById('summary-settings-button');
+    const settingsDropdown = document.getElementById('summary-settings-dropdown');
+    const themeSelect = document.getElementById('summary-theme-select');
+
+    themeSelect.value = summary_theme || 'auto';
+
+    const applyTheme = (theme) => {
+      if (theme === 'auto') {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        container.dataset.theme = prefersDark ? 'dark' : 'light';
+      } else {
+        container.dataset.theme = theme;
+      }
+    };
+
+    settingsButton?.addEventListener('click', (e) => { e.stopPropagation(); settingsDropdown.classList.toggle('show'); });
+    document.addEventListener('click', (e) => { if (!settingsDropdown.contains(e.target) && !settingsButton.contains(e.target)) { settingsDropdown.classList.remove('show'); } });
+    themeSelect?.addEventListener('change', (e) => { const selectedTheme = e.target.value; chrome.storage.local.set({ summary_theme: selectedTheme }); applyTheme(selectedTheme); });
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (themeSelect.value === 'auto') { applyTheme('auto'); } });
+    
+    const summarizeBtn = document.getElementById('summarize-video-btn');
+    const loadingDiv = document.getElementById('summary-loading');
+    const contentDiv = document.getElementById('summary-content');
+    const loadingMessage = document.getElementById('loading-message');
+    summarizeBtn?.addEventListener('click', () => { summarizeVideo(window.location.href, loadingMessage, contentDiv, loadingDiv, summarizeBtn); });
+
+  } catch (error) {
+    console.error('YouTube Maestro: Failed to inject summary panel', error);
+  }
+}
   
-      secondaryColumn.insertBefore(panel, secondaryColumn.firstChild);
-      console.log('YouTube Maestro: Panel injected successfully');
-
-      // The rest of your function that adds event listeners will now work perfectly
-      // because it's always operating on a newly created panel.
-      const container = document.getElementById('enhancer-container');
-      const settingsButton = document.getElementById('summary-settings-button');
-      const settingsDropdown = document.getElementById('summary-settings-dropdown');
-      const themeSelect = document.getElementById('summary-theme-select');
-
-      const applyTheme = (theme) => {
-        if (theme === 'auto') {
-          const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-          container.dataset.theme = prefersDark ? 'dark' : 'light';
-        } else {
-          container.dataset.theme = theme;
-        }
-      };
-
-      // Settings dropdown functionality
-      settingsButton?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        settingsDropdown.classList.toggle('show');
-      });
-
-      // Close dropdown when clicking outside
-      document.addEventListener('click', (e) => {
-        if (!settingsDropdown.contains(e.target) && !settingsButton.contains(e.target)) {
-          settingsDropdown.classList.remove('show');
-        }
-      });
-
-      // Theme change handler
-      themeSelect?.addEventListener('change', (e) => {
-        const selectedTheme = e.target.value;
-        chrome.storage.local.set({ summary_theme: selectedTheme });
-        applyTheme(selectedTheme);
-      });
-
-      // Initialize theme
-      chrome.storage.local.get('summary_theme', ({ summary_theme }) => {
-        if (summary_theme) {
-          themeSelect.value = summary_theme;
-          applyTheme(summary_theme);
-        } else {
-          applyTheme('auto');
-        }
-      });
-
-      // Listen for system theme changes
-      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-        if (themeSelect.value === 'auto') {
-          applyTheme('auto');
-        }
-      });
-
-      const summarizeBtn = document.getElementById('summarize-video-btn');
-      const loadingDiv = document.getElementById('summary-loading');
-      const contentDiv = document.getElementById('summary-content');
-      const loadingMessage = document.getElementById('loading-message');
-
-      summarizeBtn?.addEventListener('click', () => {
-        summarizeVideo(window.location.href, loadingMessage, contentDiv, loadingDiv, summarizeBtn);
-      });
-
-    } catch (error) {
-      console.error('YouTube Maestro: Failed to inject summary panel', error);
-    }
-  }
-
-  // --- Liked Videos Buttons Injection ---
-  async function injectLikedVideosButtons() {
-    try {
-      const existingButtons = document.getElementById('youtube-enhancer-liked-buttons');
-      if (existingButtons) {
-        existingButtons.remove();
-        console.log('YouTube Maestro: Removed old liked videos buttons.');
-      }
-
-      const playlistHeader = await waitForElement('#header.ytd-playlist-header-renderer');
-      if (!playlistHeader) {
-        console.log('YouTube Maestro: Playlist header not found.');
-        return;
-      }
-
-      const buttonContainer = document.createElement('div');
-      buttonContainer.id = 'youtube-enhancer-liked-buttons';
-      buttonContainer.innerHTML = `
-        <div style="
-          display: flex; gap: 12px; margin-top: 16px;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', system-ui, sans-serif;
-        ">
-          <button id="fetch-liked-videos" style="
-            background: #f9fafb; color: #374151; border: 1px solid #d1d5db;
-            border-radius: 8px; padding: 10px 16px; font-size: 13px; font-weight: 500;
-            cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; gap: 6px;
-            font-family: inherit;
-          " onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='#f9fafb'">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="7 10 12 15 17 10"/>
-              <line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            Fetch Videos
-          </button>
-          <button id="export-liked-videos" style="
-            background: #f9fafb; color: #374151; border: 1px solid #d1d5db;
-            border-radius: 8px; padding: 10px 16px; font-size: 13px; font-weight: 500;
-            cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; gap: 6px;
-            font-family: inherit;
-          " onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='#f9fafb'">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="17 8 12 3 7 8"/>
-              <line x1="12" y1="3" x2="12" y2="15"/>
-            </svg>
-            Export Data
-          </button>
-        </div>
-      `;
-      playlistHeader.appendChild(buttonContainer);
-
-      document.getElementById('fetch-liked-videos')?.addEventListener('click', () => {
-        if (window.chrome?.runtime) window.chrome.runtime.sendMessage({ action: 'fetchLikedVideos' });
-      });
-
-      document.getElementById('export-liked-videos')?.addEventListener('click', () => {
-        if (window.chrome?.runtime) window.chrome.runtime.sendMessage({ action: 'exportData' });
-      });
-    } catch (error) {
-      console.error('YouTube Maestro: Failed to inject liked video buttons', error);
-    }
-  }
 
   // --- UI/UX Functions ---
   async function summarizeVideo(videoUrl, loadingMessage, contentDiv, loadingDiv, summarizeBtn) {
