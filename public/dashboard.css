@@ -1,37 +1,5 @@
 
 /* Global Styles */
-:root {
-  --primary: #ff1744;
-  --primary-hover: #d50000;
-  --secondary: #c62828;
-  --text-primary: #000000;
-  --text-secondary: #666666;
-  --text-tertiary: #888888;
-  --background: #ffffff;
-  --background-secondary: #f5f5f5;
-  --background-tertiary: #f0f0f0;
-  --border: #e0e0e0;
-  --border-secondary: #e5e7eb;
-  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-  --shadow-hover: 0 4px 20px rgba(0,0,0,0.1);
-  --success: #10b981;
-  --danger: #dc2626;
-  --warning: #f59e0b;
-}
-
-[data-theme="dark"] {
-  --text-primary: #ffffff;
-  --text-secondary: #cccccc;
-  --text-tertiary: #999999;
-  --background: #000000;
-  --background-secondary: #1a1a1a;
-  --background-tertiary: #333333;
-  --border: #333333;
-  --border-secondary: #444444;
-  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
-  --shadow-hover: 0 4px 20px rgba(0,0,0,0.3);
-}
-
 * {
   margin: 0;
   padding: 0;
@@ -40,25 +8,22 @@
 
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: var(--background-secondary);
-  color: var(--text-primary);
+  background: #f5f5f5;
   min-height: 100vh;
-  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .dashboard-container {
   max-width: 1400px;
   margin: 0 auto;
-  background: var(--background);
+  background: white;
   min-height: 100vh;
-  box-shadow: var(--shadow);
-  transition: background-color 0.3s ease;
+  box-shadow: 0 0 20px rgba(0,0,0,0.05);
 }
 
 /* Header Styles */
 header {
-  background: var(--background);
-  border-bottom: 1px solid var(--border-secondary);
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
   padding: 20px 30px;
 }
 
@@ -84,7 +49,7 @@ header {
   font-size: 24px;
   font-weight: 600;
   margin: 0;
-  color: var(--text-primary);
+  color: #333;
 }
 
 .user-info {
@@ -122,35 +87,11 @@ header {
 
 .user-info #dashboard-user-email { /* Updated selector for the email span */
   font-size: 14px;
-  color: var(--text-secondary);
+  color: #555; /* Slightly darker color for better contrast */
   white-space: nowrap; /* Prevent email from wrapping */
   overflow: hidden;
   text-overflow: ellipsis; /* Add ellipsis if too long */
   max-width: 150px; /* Adjust as needed to prevent very long emails from pushing content */
-}
-
-/* Theme Toggle Button */
-.settings-container {
-  margin-left: 15px;
-}
-
-.theme-toggle-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 8px;
-  border-radius: 8px;
-  color: var(--text-secondary);
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.theme-toggle-btn:hover {
-  background-color: var(--background-secondary);
-  color: var(--primary);
-  transform: rotate(180deg);
 }
 
 /* Main Content */
@@ -169,7 +110,7 @@ main {
 
 .dashboard-header h2 {
   font-size: 28px;
-  color: var(--text-primary);
+  color: #333;
   font-weight: 600;
 }
 
@@ -185,27 +126,24 @@ main {
 
 .search-container input {
   padding: 10px 16px;
-  border: 1px solid var(--border-secondary);
+  border: 1px solid #e5e7eb;
   border-radius: 8px;
   width: 250px;
   font-size: 14px;
-  background: var(--background);
-  color: var(--text-primary);
   transition: all 0.2s ease;
 }
 
 .search-container input:focus {
   outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(255, 23, 68, 0.1);
+  border-color: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
 }
 
 .filter-container select {
   padding: 10px 16px;
-  border: 1px solid var(--border-secondary);
+  border: 1px solid #e5e7eb;
   border-radius: 8px;
-  background: var(--background);
-  color: var(--text-primary);
+  background: white;
   font-size: 14px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -213,7 +151,7 @@ main {
 
 .filter-container select:focus {
   outline: none;
-  border-color: var(--primary);
+  border-color: #dc2626;
 }
 
 /* Video Grid */
@@ -229,17 +167,17 @@ main {
 }
 
 .video-card {
-  background: var(--background);
+  background: white;
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: var(--shadow);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
   transition: all 0.3s ease;
-  border: 1px solid var(--border);
+  border: 1px solid #f0f0f0;
 }
 
 .video-card:hover {
   transform: translateY(-2px);
-  box-shadow: var(--shadow-hover);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
 }
 
 .video-thumbnail {
@@ -287,17 +225,17 @@ main {
 }
 
 .video-title a {
-  color: var(--text-primary);
+  color: #333;
   text-decoration: none;
   transition: color 0.2s ease;
 }
 
 .video-title a:hover {
-  color: var(--primary);
+  color: #dc2626;
 }
 
 .video-channel {
-  color: var(--text-secondary);
+  color: #666;
   font-size: 14px;
   margin-bottom: 8px;
   font-weight: 500;
@@ -306,7 +244,7 @@ main {
 .video-meta {
   display: flex;
   gap: 12px;
-  color: var(--text-tertiary);
+  color: #888;
   font-size: 12px;
   margin-bottom: 15px;
 }
@@ -330,35 +268,35 @@ main {
 }
 
 .download-button {
-  background: var(--background);
-  color: var(--text-secondary);
-  border: 1px solid var(--border-secondary);
+  background: white;
+  color: #666;
+  border: 1px solid #e2e8f0;
   flex: 1;
 }
 
 .download-button:hover {
-  background: var(--background-secondary);
-  border-color: var(--primary);
-  color: var(--primary);
+  background: #f8f9fa;
+  border-color: #dc2626;
+  color: #dc2626;
   transform: translateY(-1px);
 }
 
 .download-button:disabled {
-  background: var(--background-secondary);
-  color: var(--text-tertiary);
-  border-color: var(--border-secondary);
+  background: #f5f5f5;
+  color: #a0aec0;
+  border-color: #e2e8f0;
   cursor: not-allowed;
   transform: none;
 }
 
 .delete-button {
-  background: rgba(220, 38, 38, 0.1);
-  color: var(--danger);
-  border: 1px solid rgba(220, 38, 38, 0.2);
+  background: #fee;
+  color: #dc2626;
+  border: 1px solid #fed7d7;
 }
 
 .delete-button:hover {
-  background: var(--danger);
+  background: #dc2626;
   color: white;
   transform: translateY(-1px);
 }
@@ -369,19 +307,19 @@ main {
   bottom: 0;
   left: 0;
   right: 0;
-  background: var(--background);
-  border-top: 1px solid var(--border-secondary);
+  background: white;
+  border-top: 1px solid #e5e7eb;
   padding: 15px 30px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: var(--shadow);
+  box-shadow: 0 -2px 20px rgba(0,0,0,0.05);
   z-index: 1000;
 }
 
 .selection-info {
   font-weight: 500;
-  color: var(--text-primary);
+  color: #333;
 }
 
 .bulk-actions {
@@ -400,26 +338,26 @@ main {
 }
 
 .secondary-button {
-  background: var(--background-secondary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-secondary);
+  background: #f7fafc;
+  color: #333;
+  border: 1px solid #e2e8f0;
 }
 
 .secondary-button:hover {
-  background: var(--background-tertiary);
+  background: #edf2f7;
 }
 
 .danger-button {
-  background: var(--danger);
+  background: #dc2626;
   color: white;
 }
 
 .danger-button:hover {
-  background: var(--primary-hover);
+  background: #b91c1c;
 }
 
 .danger-button:disabled {
-  background: var(--text-tertiary);
+  background: #a0aec0;
   cursor: not-allowed;
 }
 
@@ -438,23 +376,23 @@ main {
 }
 
 .modal-content {
-  background: var(--background);
+  background: white;
   padding: 30px;
   border-radius: 12px;
   max-width: 500px;
   width: 90%;
-  box-shadow: var(--shadow);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
 }
 
 .modal-content h3 {
   margin: 0 0 15px 0;
   font-size: 20px;
-  color: var(--text-primary);
+  color: #333;
 }
 
 .modal-content p {
   margin: 0 0 25px 0;
-  color: var(--text-secondary);
+  color: #666;
   line-height: 1.5;
 }
 
@@ -468,7 +406,7 @@ main {
 #loading, #no-videos {
   text-align: center;
   padding: 60px 20px;
-  color: var(--text-secondary);
+  color: #666;
   font-size: 16px;
 }
 
@@ -479,14 +417,14 @@ main {
 
 .total-count {
   text-align: center;
-  color: var(--text-secondary);
+  color: #666;
   font-size: 14px;
   margin-bottom: 20px;
 }
 
 .error-message {
   text-align: center;
-  color: var(--danger);
+  color: #dc2626;
   font-size: 14px;
   margin-top: 16px;
 }
@@ -507,11 +445,11 @@ main {
   position: fixed;
   top: 20px;
   right: 20px;
-  background: var(--success);
+  background: #10b981;
   color: white;
   padding: 12px 20px;
   border-radius: 8px;
-  box-shadow: var(--shadow);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
   z-index: 10000;
   font-size: 14px;
   font-weight: 500;
