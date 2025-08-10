@@ -1,531 +1,593 @@
-// Enhanced YouTube extension with secure backend integration
+// Prevent multiple script executions
+if (window.youtubeEnhancerLoaded) {
+  console.log('YouTube Maestro: Script already loaded, skipping subsequent executions.');
+} else {
+  window.youtubeEnhancerLoaded = true;
+  console.log('YouTube Maestro: Content script loaded and initialized.');
 
-// 🔥 IMPORTANT: Backend URL Configuration 🔥
-// For LOCAL DEVELOPMENT: Use 'http://localhost:3000/api'
-// For PRODUCTION: Use your Railway URL 'https://friendly-message-sandbox-app-production.up.railway.app/api'
-const API_BASE_URL = 'http://localhost:3000/api'; // 👈 SET TO LOCAL FOR DEVELOPMENT
+  // 1) Your existing history.patch + youtube-url-change listener
+  (function() {
+    const origPush = history.pushState, origReplace = history.replaceState;
+    function fireUrlChange() { window.dispatchEvent(new Event('youtube-url-change')); }
+    history.pushState = function(...a){ origPush.apply(this, a); fireUrlChange(); };
+    history.replaceState = function(...a){ origReplace.apply(this, a); fireUrlChange(); };
+    window.addEventListener('popstate', fireUrlChange);
+  })();
+  window.addEventListener('youtube-url-change', () => setTimeout(main, 200));
 
-function injectSummarizationPanel() {
-  // Check if we're on a YouTube video page
-  if (!window.location.href.includes('youtube.com/watch')) {
-    return;
-  }
+  // 2) URL-polling fallback
+  let lastUrl = location.href;
+  setInterval(() => {
+    if (location.href !== lastUrl) {
+      lastUrl = location.href;
+      main();
+    }
+  }, 300);
 
-  // Remove existing panel if it exists
-  const existingPanel = document.getElementById('youtube-enhancer-panel');
-  if (existingPanel) {
-    existingPanel.remove();
-  }
+  const API_BASE_URL = 'http://localhost:3000/api';
 
-  // Wait for YouTube's secondary column to load
-  const secondaryColumn = document.querySelector('#secondary');
-  if (!secondaryColumn) {
-    setTimeout(injectSummarizationPanel, 1000);
-    return;
-  }
+  // --- Core Logic ---
+  let isInjecting = false;
 
-  // Create the professional summarization panel
-  const panel = document.createElement('div');
-  panel.id = 'youtube-enhancer-panel';
-  panel.innerHTML = `
-    <div style="
-      background: #ffffff;
-      border-radius: 12px;
-      margin-bottom: 16px;
-      overflow: hidden;
-      border: 1px solid #e5e7eb;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', system-ui, sans-serif;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    ">
-      <!-- Professional Header -->
-      <div style="
-        background: #f9fafb;
-        padding: 16px 20px;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        border-bottom: 1px solid #e5e7eb;
-      ">
-        <div style="
-          width: 20px;
-          height: 20px;
-          background: #f3f4f6;
-          border-radius: 4px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 10px;
-          color: #374151;
-          font-weight: 600;
-          border: 1px solid #d1d5db;
-        ">AI</div>
-        <h3 style="
-          margin: 0;
-          font-size: 14px;
-          font-weight: 600;
-          color: #111827;
-          letter-spacing: -0.025em;
-        ">Video Summary</h3>
-        <div style="
-          margin-left: auto;
-          font-size: 10px;
-          color: #6b7280;
-          background: #f3f4f6;
-          padding: 2px 6px;
-          border-radius: 3px;
-        ">Backend: ${API_BASE_URL.includes('localhost') ? 'Local' : 'Railway'}</div>
-      </div>
-      
-      <!-- Content -->
-      <div style="padding: 20px;">
-        <button id="summarize-video-btn" style="
-          width: 100%;
-          background: #f9fafb;
-          color: #374151;
-          border: 1px solid #d1d5db;
-          border-radius: 8px;
-          padding: 12px 16px;
-          font-size: 13px;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          margin-bottom: 16px;
-          font-family: inherit;
-          letter-spacing: -0.025em;
-        " onmouseover="this.style.background='#f3f4f6'; this.style.borderColor='#9ca3af'" 
-           onmouseout="this.style.background='#f9fafb'; this.style.borderColor='#d1d5db'">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-          </svg>
-          <span>Generate Summary</span>
-        </button>
-        
-        <div id="summary-loading" style="
-          display: none;
-          text-align: center;
-          padding: 24px;
-          background: #f9fafb;
-          border-radius: 8px;
-          border: 1px solid #f3f4f6;
-        ">
-          <div style="
-            width: 16px;
-            height: 16px;
-            border: 2px solid #f3f4f6;
-            border-top: 2px solid #6b7280;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 12px;
-          "></div>
-          <div style="
-            font-size: 12px; 
-            color: #6b7280;
-            font-weight: 400;
-          " id="loading-message">Analyzing video transcript...</div>
-        </div>
-        
-        <div id="summary-content" style="
-          display: none;
-          background: #ffffff;
-          border-radius: 8px;
-          border: 1px solid #f3f4f6;
-          overflow: hidden;
-        "></div>
-      </div>
-    </div>
+  async function main() {
+    if (isInjecting) return;
     
-    <style>
-      @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-      }
-    </style>
-  `;
-
-  // Insert the panel at the top of the secondary column
-  secondaryColumn.insertBefore(panel, secondaryColumn.firstChild);
-
-  // Add event listeners
-  const summarizeBtn = document.getElementById('summarize-video-btn');
-  const loadingDiv = document.getElementById('summary-loading');
-  const contentDiv = document.getElementById('summary-content');
-  const loadingMessage = document.getElementById('loading-message');
-
-  summarizeBtn?.addEventListener('click', async () => {
-    const currentUrl = window.location.href;
-    
-    // Show loading
-    summarizeBtn.style.display = 'none';
-    loadingDiv.style.display = 'block';
-    contentDiv.style.display = 'none';
+    isInjecting = true;
+    console.log('YouTube Maestro: Main function triggered for URL:', window.location.href);
 
     try {
-      await summarizeVideo(currentUrl, loadingMessage, contentDiv, loadingDiv, summarizeBtn);
+      // *** FIX: Corrected URL check ***
+      if (!window.location.href.includes('www.youtube.com')) return;
+
+      await waitForYouTubeReady();
+
+      if (window.location.href.includes('/watch')) {
+        await injectSummarizationPanel();
+      } else if (window.location.href.includes('/playlist?list=LL')) {
+        await injectLikedVideosButtons();
+      }
     } catch (error) {
-      console.error('Error:', error);
+      console.error('YouTube Maestro: Main function error:', error);
+    } finally {
+      isInjecting = false;
+    }
+  }
+
+  // --- Helper Functions ---
+  
+  // Enhanced element detection for YouTube's dynamic DOM
+  function waitForElement(selector, timeout = 15000) {
+    return new Promise((resolve, reject) => {
+      const checkElement = () => {
+        const element = document.querySelector(selector);
+        if (element && element.offsetParent !== null) return element;
+        return null;
+      };
+
+      const element = checkElement();
+      if (element) {
+        console.log(`YouTube Maestro: Found element immediately: ${selector}`);
+        return resolve(element);
+      }
+
+      console.log(`YouTube Maestro: Waiting for element: ${selector}`);
+      const observer = new MutationObserver(() => {
+        const element = checkElement();
+        if (element) {
+          console.log(`YouTube Maestro: Found element via MutationObserver: ${selector}`);
+          observer.disconnect();
+          resolve(element);
+        }
+      });
+      
+      observer.observe(document.documentElement, { 
+        childList: true, 
+        subtree: true
+      });
+
+      setTimeout(() => {
+        observer.disconnect();
+        const finalElement = checkElement();
+        if (finalElement) {
+          resolve(finalElement);
+        } else {
+          reject(new Error(`Element ${selector} not found after timeout`));
+        }
+      }, timeout);
+    });
+  }
+
+  // Enhanced YouTube readiness detection
+  function waitForYouTubeReady() {
+    console.log('YouTube Maestro: Checking YouTube readiness...');
+    // This function now simply waits for the key element we need to inject our panel into.
+    // This is more direct than checking for multiple, unrelated elements.
+    return waitForElement('#secondary-inner');
+  }
+
+// In content.js
+
+  // --- NEW SIMPLIFIED Summarization Panel Injection ---
+  async function injectSummarizationPanel() {
+    try {
+      console.log('YouTube Maestro: Starting panel injection...');
+      
+      // --- CHANGE 1: SIMPLIFIED LOGIC ---
+      // We now always remove the old panel to ensure a fresh start on every video.
+      const existingPanel = document.getElementById('youtube-enhancer-panel');
+      if (existingPanel) {
+          console.log('YouTube Maestro: Old panel found. Removing it for a clean re-injection.');
+          existingPanel.remove();
+      }
+      // No more complex "reset" logic. We will always create a new panel.
+  
+      const secondaryColumn = await waitForElement('#secondary-inner');
+      if (!secondaryColumn) {
+        console.log('YouTube Maestro: Secondary column not found.');
+        return;
+      }
+  
+      const panel = document.createElement('div');
+      panel.id = 'youtube-enhancer-panel';
+      // --- CHANGE 2: ADDED THE MISSING HTML FOR THE LANGUAGE SELECTOR ---
+      panel.innerHTML = `
+        <div id="enhancer-container">
+          <div class="enhancer-header">
+            <div class="enhancer-title-group">
+              <h3>AI Summary</h3>
+            </div>
+            <button class="settings-button" id="summary-settings-button">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1m17-4a4 4 0 0 1-8 0 4 4 0 0 1 8 0zM7 21a4 4 0 0 1-8 0 4 4 0 0 1 8 0z"/>
+              </svg>
+            </button>
+            <div class="settings-dropdown" id="summary-settings-dropdown">
+              <div class="setting-item">
+                <label>Language:</label>
+                <select id="summary-language-select">
+                  <option value="English" selected>English</option>
+                  <option value="Arabic">العربية</option>
+                  <option value="Turkish">Türkçe</option>
+                </select>
+              </div>
+              <div class="setting-item">
+                <label>Theme:</label>
+                <select id="summary-theme-select">
+                  <option value="auto">Auto</option>
+                  <option value="light">Light</option>
+                  <option value="dark">Dark</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="enhancer-content-area">
+            <button id="summarize-video-btn">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-color)" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg>
+              <span>Summarize Video</span>
+            </button>
+            <div id="summary-loading" style="display: none;">
+              <div class="enhancer-loader"></div>
+              <div id="loading-message"></div>
+            </div>
+            <div id="summary-content" style="display: none;"></div>
+          </div>
+        </div>
+        <style>
+          :root { --accent-color: #FF0000; }
+          #enhancer-container {
+            --bg-color: #FFFFFF; --text-color: #0f0f0f; --secondary-text-color: #606060;
+            --border-color: #e5e5e5; --button-bg-color: #f2f2f2; --button-hover-bg-color: #e5e5e5;
+            --scrollbar-thumb-color: #CCCCCC; --error-bg-color: #FFF5F5; --error-border-color: #FECACA;
+            --error-text-color: #991B1B; --limit-bg-color: #FFFBEB; --limit-border-color: #FDE68A;
+            --limit-text-color: #92400E;
+          }
+          #enhancer-container[data-theme="dark"] {
+            --bg-color: #212121; --text-color: #f1f1f1; --secondary-text-color: #aaaaaa;
+            --border-color: #3d3d3d; --button-bg-color: #3F3F3F; --button-hover-bg-color: #5A5A5A;
+            --scrollbar-thumb-color: #5A5A5A; --error-bg-color: rgba(153, 27, 27, 0.2);
+            --error-border-color: rgba(153, 27, 27, 0.5); --error-text-color: #FCA5A5;
+            --limit-bg-color: rgba(146, 64, 14, 0.2); --limit-border-color: rgba(146, 64, 14, 0.5);
+            --limit-text-color: #FCD34D;
+          }
+          #enhancer-container { background: var(--bg-color); color: var(--text-color); border-radius: 12px;
+            margin-bottom: 16px; border: 1px solid var(--border-color); font-family: 'Roboto', sans-serif;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); overflow: hidden;
+            transition: background-color 0.3s, color 0.3s, border-color 0.3s; }
+          .enhancer-header { padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); position: relative; }
+          .enhancer-title-group { display: flex; align-items: center; gap: 12px; }
+          .enhancer-header h3 { margin: 0; font-size: 16px; font-weight: 500; color: var(--text-color); }
+          .settings-button { background: none; border: none; color: var(--text-color); cursor: pointer; padding: 4px; border-radius: 4px; transition: background-color 0.2s; }
+          .settings-button:hover { background: var(--button-bg-color); }
+          .settings-dropdown { position: absolute; top: 100%; right: 0; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px; min-width: 150px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 1000; display: none; }
+          .settings-dropdown.show { display: block; }
+          .setting-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+          .setting-item:last-child { margin-bottom: 0; }
+          .setting-item label { font-size: 12px; color: var(--secondary-text-color); font-weight: 500; }
+          .setting-item select { background: var(--button-bg-color); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 4px; padding: 2px 6px; font-size: 11px; }
+          .enhancer-content-area { padding: 16px; }
+          #summarize-video-btn { 
+            width: 100%; background: var(--button-bg-color); color: var(--text-color); border: none;
+            margin-top: 16px; /* Added margin to create space */
+            border-radius: 18px; padding: 10px 16px; font-size: 14px; font-weight: 500; cursor: pointer;
+            transition: background-color 0.2s ease; display: flex; align-items: center; justify-content: center; gap: 8px; 
+          }
+          #summarize-video-btn:hover { background: var(--button-hover-bg-color); }
+          #summary-loading { text-align: center; padding: 16px 0; color: var(--secondary-text-color); }
+          .enhancer-loader { width: 24px; height: 24px; margin: 0 auto 16px; border: 2px solid var(--accent-color);
+            border-bottom-color: transparent; border-radius: 50%; animation: enhancer-rotation 1s linear infinite; }
+          @keyframes enhancer-rotation { 100% { transform: rotate(360deg); } }
+        </style>
+      `;
+  
+      secondaryColumn.insertBefore(panel, secondaryColumn.firstChild);
+      console.log('YouTube Maestro: Panel injected successfully');
+
+      // The rest of your function that adds event listeners will now work perfectly
+      // because it's always operating on a newly created panel.
+      const container = document.getElementById('enhancer-container');
+      const settingsButton = document.getElementById('summary-settings-button');
+      const settingsDropdown = document.getElementById('summary-settings-dropdown');
+      const themeSelect = document.getElementById('summary-theme-select');
+
+      const applyTheme = (theme) => {
+        if (theme === 'auto') {
+          const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          container.dataset.theme = prefersDark ? 'dark' : 'light';
+        } else {
+          container.dataset.theme = theme;
+        }
+      };
+
+      // Settings dropdown functionality
+      settingsButton?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        settingsDropdown.classList.toggle('show');
+      });
+
+      // Close dropdown when clicking outside
+      document.addEventListener('click', (e) => {
+        if (!settingsDropdown.contains(e.target) && !settingsButton.contains(e.target)) {
+          settingsDropdown.classList.remove('show');
+        }
+      });
+
+      // Theme change handler
+      themeSelect?.addEventListener('change', (e) => {
+        const selectedTheme = e.target.value;
+        chrome.storage.local.set({ summary_theme: selectedTheme });
+        applyTheme(selectedTheme);
+      });
+
+      // Initialize theme
+      chrome.storage.local.get('summary_theme', ({ summary_theme }) => {
+        if (summary_theme) {
+          themeSelect.value = summary_theme;
+          applyTheme(summary_theme);
+        } else {
+          applyTheme('auto');
+        }
+      });
+
+      // Listen for system theme changes
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+        if (themeSelect.value === 'auto') {
+          applyTheme('auto');
+        }
+      });
+
+      const summarizeBtn = document.getElementById('summarize-video-btn');
+      const loadingDiv = document.getElementById('summary-loading');
+      const contentDiv = document.getElementById('summary-content');
+      const loadingMessage = document.getElementById('loading-message');
+
+      summarizeBtn?.addEventListener('click', () => {
+        summarizeVideo(window.location.href, loadingMessage, contentDiv, loadingDiv, summarizeBtn);
+      });
+
+    } catch (error) {
+      console.error('YouTube Maestro: Failed to inject summary panel', error);
+    }
+  }
+
+  // --- Liked Videos Buttons Injection ---
+  async function injectLikedVideosButtons() {
+    try {
+      const existingButtons = document.getElementById('youtube-enhancer-liked-buttons');
+      if (existingButtons) {
+        existingButtons.remove();
+        console.log('YouTube Maestro: Removed old liked videos buttons.');
+      }
+
+      const playlistHeader = await waitForElement('#header.ytd-playlist-header-renderer');
+      if (!playlistHeader) {
+        console.log('YouTube Maestro: Playlist header not found.');
+        return;
+      }
+
+      const buttonContainer = document.createElement('div');
+      buttonContainer.id = 'youtube-enhancer-liked-buttons';
+      buttonContainer.innerHTML = `
+        <div style="
+          display: flex; gap: 12px; margin-top: 16px;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', system-ui, sans-serif;
+        ">
+          <button id="fetch-liked-videos" style="
+            background: #f9fafb; color: #374151; border: 1px solid #d1d5db;
+            border-radius: 8px; padding: 10px 16px; font-size: 13px; font-weight: 500;
+            cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; gap: 6px;
+            font-family: inherit;
+          " onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='#f9fafb'">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Fetch Videos
+          </button>
+          <button id="export-liked-videos" style="
+            background: #f9fafb; color: #374151; border: 1px solid #d1d5db;
+            border-radius: 8px; padding: 10px 16px; font-size: 13px; font-weight: 500;
+            cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; gap: 6px;
+            font-family: inherit;
+          " onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='#f9fafb'">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            Export Data
+          </button>
+        </div>
+      `;
+      playlistHeader.appendChild(buttonContainer);
+
+      document.getElementById('fetch-liked-videos')?.addEventListener('click', () => {
+        if (window.chrome?.runtime) window.chrome.runtime.sendMessage({ action: 'fetchLikedVideos' });
+      });
+
+      document.getElementById('export-liked-videos')?.addEventListener('click', () => {
+        if (window.chrome?.runtime) window.chrome.runtime.sendMessage({ action: 'exportData' });
+      });
+    } catch (error) {
+      console.error('YouTube Maestro: Failed to inject liked video buttons', error);
+    }
+  }
+
+  // --- UI/UX Functions ---
+  async function summarizeVideo(videoUrl, loadingMessage, contentDiv, loadingDiv, summarizeBtn) {
+    const wittyLoadingMessages = [
+      "Warming up the thinking cap...",
+      "Scanning for brilliant ideas...",
+      "Distilling the key points...",
+      "Finding the hidden gems...",
+      "Assembling the highlights...",
+      "Just a moment, magic in progress..."
+    ];
+    let messageIndex = 0;
+    loadingDiv.style.display = 'block';
+    summarizeBtn.style.display = 'none';
+    contentDiv.style.display = 'none';
+    summarizeBtn.disabled = true;
+
+    loadingMessage.textContent = wittyLoadingMessages[messageIndex];
+    const loadingInterval = setInterval(() => {
+      messageIndex = (messageIndex + 1) % wittyLoadingMessages.length;
+      loadingMessage.textContent = wittyLoadingMessages[messageIndex];
+    }, 2500);
+
+    try {
+      const authResponse = await chrome.runtime.sendMessage({ action: 'checkAuth' });
+      if (!authResponse || !authResponse.success) {
+        throw new Error(authResponse?.needsReauth
+          ? 'Your session has expired. Please sign in again via the extension popup.'
+          : 'Authentication required. Please sign in via the extension popup to use this feature.');
+      }
+
+      const { userId, userInfo, userFullName } = authResponse;
+
+      // START: Get the selected language from the dropdown
+      const selectedLanguage = document.getElementById('summary-language-select').value;
+      console.log(`YouTube Maestro: Summarizing in ${selectedLanguage}`);
+      // END: Get the selected language
+
+      const response = await fetch(`${API_BASE_URL}/summary/youtube`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoUrl, userId, email: userInfo.email, fullName: userFullName, summaryLanguage: selectedLanguage})
+      });
+
+      const data = await response.json();
+      clearInterval(loadingInterval);
+
+      if (!response.ok) {
+        if (data.code === 'LIMIT_REACHED') {
+          showRateLimitError(contentDiv, loadingDiv, summarizeBtn, data);
+        } else {
+          throw new Error(data.message || 'The summary magic fizzled out. Please try again.');
+        }
+        return;
+      }
+
+      showSuccess(contentDiv, loadingDiv, summarizeBtn, data.summary);
+    } catch (error) {
+      clearInterval(loadingInterval);
+      console.error('❌ Error during summarization:', error);
       showError(contentDiv, loadingDiv, summarizeBtn, error.message);
     }
-  });
-}
-
-// Secure backend API call
-async function summarizeVideo(videoUrl, loadingMessage, contentDiv, loadingDiv, summarizeBtn) {
-  try {
-    loadingMessage.textContent = 'Connecting to backend...';
-    
-    console.log('🔗 Making API request to backend:', API_BASE_URL);
-    console.log('🎯 Video URL:', videoUrl);
-    
-    const response = await fetch(`${API_BASE_URL}/summary/youtube`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        videoUrl: videoUrl
-      })
-    });
-
-    loadingMessage.textContent = 'Processing with AI...';
-
-    console.log('📡 Response status:', response.status);
-    console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
-
-    if (!response.ok) {
-      let errorData;
-      const contentType = response.headers.get('content-type');
-      
-      if (contentType && contentType.includes('application/json')) {
-        errorData = await response.json();
-      } else {
-        const textResponse = await response.text();
-        console.error('❌ Non-JSON response:', textResponse);
-        errorData = { error: `Server returned HTML instead of JSON. Status: ${response.status}` };
-      }
-      
-      throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    console.log('✅ Backend response received:', data);
-    
-    if (data.success && data.summary) {
-      showSuccess(contentDiv, loadingDiv, summarizeBtn, data.summary, data.metadata);
-    } else {
-      throw new Error(data.error || 'No summary received from backend');
-    }
-    
-  } catch (error) {
-    console.error('❌ Backend API error:', error);
-    
-    if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-      throw new Error(`🔌 Cannot connect to backend at: ${API_BASE_URL}\n\nMake sure your backend is running:\n- Local: npm start in backend folder\n- Railway: Check deployment status`);
-    } else if (error.message.includes('HTML instead of JSON')) {
-      throw new Error(`🏗️ Backend is returning HTML (probably an error page).\n\nCheck:\n- Backend logs for errors\n- Environment variables (GOOGLE_AI_API_KEY)\n- Endpoint URL: ${API_BASE_URL}`);
-    } else {
-      throw error;
-    }
   }
-}
 
-function showSuccess(contentDiv, loadingDiv, summarizeBtn, summary, metadata) {
-  loadingDiv.style.display = 'none';
-  
-  contentDiv.innerHTML = `
-    <div style="
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 14px 16px;
-      background: #f9fafb;
-      border-bottom: 1px solid #f3f4f6;
-    ">
-      <strong style="
-        color: #111827; 
-        font-size: 13px;
-        font-weight: 600;
-        letter-spacing: -0.025em;
-      ">Video Summary</strong>
-      <div style="display: flex; gap: 8px; align-items: center;">
-        <span style="font-size: 10px; color: #6b7280; background: #f3f4f6; padding: 2px 6px; border-radius: 3px;">
-          ✓ ${metadata?.detectedLanguage || 'Auto'}
-        </span>
-        <button id="copy-summary" style="
-          background: #ffffff;
-          color: #374151;
-          border: 1px solid #d1d5db;
-          border-radius: 5px;
-          padding: 5px 10px;
-          font-size: 11px;
-          cursor: pointer;
-          font-weight: 500;
-          transition: all 0.2s ease;
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          font-family: inherit;
+  function showSuccess(contentDiv, loadingDiv, summarizeBtn, summary) {
+    loadingDiv.style.display = 'none';
+    summarizeBtn.style.display = 'none';
+
+    function parseEnhancedSummary(text) {
+      let html = '';
+      const sections = text.split('\n\n');
+      sections.forEach(section => {
+        const lines = section.trim().split('\n');
+        const headerLine = lines.shift();
+        const headerMatch = headerLine.match(/^(.*?) \*\*(.*)\*\*$/);
+
+        if (headerMatch) {
+          const emoji = headerMatch[1];
+          const title = headerMatch[2];
+          html += `<div class="summary-section">`;
+          html += `<div class="summary-header">
+            <span class="summary-emoji">${emoji}</span>
+            <span class="summary-title">${title}</span>
+          </div>`;
+          html += `<ul class="summary-list">`;
+          lines.forEach(line => {
+            if (line.trim().startsWith('-')) {
+              let point = line.trim().substring(1).trim()
+                .replace(/\*(.*?)\*/g, '<span class="highlight">$1</span>');
+              html += `<li>${point}</li>`;
+            }
+          });
+          html += `</ul></div>`;
+        }
+      });
+      return html;
+    }
+
+    const summaryHtml = parseEnhancedSummary(summary);
+    contentDiv.innerHTML = `
+      <div id="summary-text">${summaryHtml}</div>
+      <div style="text-align: right; border-top: 1px solid var(--border-color); padding-top: 12px; margin-top: 16px;">
+        <button id="copy-summary-btn" style="
+          background: var(--button-bg-color); color: var(--secondary-text-color);
+          border: none; border-radius: 8px; padding: 8px 12px; font-size: 13px;
+          font-weight: 500; cursor: pointer; transition: all 0.2s ease;
+          display: inline-flex; align-items: center; gap: 6px;
         ">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
-            <path d="m4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
-          </svg>
-          Copy
+          <svg id="copy-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+          <span id="copy-text">Copy</span>
         </button>
       </div>
-    </div>
-    <div style="
-      padding: 16px;
-      line-height: 1.7;
-      font-size: 14px;
-      color: #111827;
-      max-height: 500px;
-      overflow-y: auto;
-      word-wrap: break-word;
-      word-break: break-word;
-      white-space: pre-wrap;
-      font-weight: 400;
-      letter-spacing: -0.025em;
-      background: #ffffff;
-      scrollbar-width: thin;
-      scrollbar-color: #cbd5e1 #f1f5f9;
-    " id="summary-text">${summary}</div>
-  `;
-  
-  // Enhanced scrollbar styling for webkit browsers
-  const summaryText = document.getElementById('summary-text');
-  if (summaryText) {
-    const style = document.createElement('style');
-    style.textContent = `
-      #summary-text::-webkit-scrollbar {
-        width: 6px;
-      }
-      #summary-text::-webkit-scrollbar-track {
-        background: #f1f5f9;
-        border-radius: 3px;
-      }
-      #summary-text::-webkit-scrollbar-thumb {
-        background: #cbd5e1;
-        border-radius: 3px;
-      }
-      #summary-text::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8;
-      }
+      <style>
+        #summary-text {
+          line-height: 1.7; font-size: 14px; max-height: 450px; overflow-y: auto;
+          font-family: 'Roboto', sans-serif; scrollbar-width: thin;
+          color: var(--text-color); scrollbar-color: var(--scrollbar-thumb-color) transparent;
+          padding-right: 12px;
+        }
+        #summary-text::-webkit-scrollbar { width: 6px; }
+        #summary-text::-webkit-scrollbar-track { background: transparent; }
+        #summary-text::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb-color); border-radius: 3px; }
+        .summary-section { margin-bottom: 16px; }
+        .summary-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .summary-emoji { font-size: 18px; }
+        .summary-title { font-weight: 600; font-size: 15px; color: var(--text-color); }
+        .summary-list { list-style: none; padding-left: 26px; margin: 0; }
+        .summary-list li { position: relative; margin-bottom: 6px; color: var(--secondary-text-color); }
+        .summary-list li::before {
+          content: '•'; position: absolute; left: -16px; top: 0;
+          color: var(--text-color); font-weight: bold;
+        }
+        .highlight {
+          color: var(--text-color); background-color: var(--limit-bg-color);
+          padding: 1px 4px; border-radius: 4px; font-weight: 500;
+        }
+        #copy-summary-btn:hover { background: var(--button-hover-bg-color) !important; color: var(--text-color); }
+      </style>
     `;
-    document.head.appendChild(style);
-  }
-  
-  // Add copy functionality
-  const copyBtn = document.getElementById('copy-summary');
-  copyBtn?.addEventListener('click', async () => {
-    try {
-      await navigator.clipboard.writeText(summary);
-      copyBtn.innerHTML = `
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="20 6 9 17 4 12"/>
-        </svg>
-        Copied!
-      `;
-      copyBtn.style.color = '#059669';
+    contentDiv.style.display = 'block';
+
+    document.getElementById('copy-summary-btn')?.addEventListener('click', (e) => {
+      navigator.clipboard.writeText(summary);
+      const btn = e.currentTarget;
+      const icon = btn.querySelector('#copy-icon');
+      const text = btn.querySelector('#copy-text');
+      icon.innerHTML = `<path d="M20 6L9 17l-5-5" stroke="#4CAF50" />`;
+      text.textContent = 'Copied!';
+      btn.style.color = '#4CAF50';
       setTimeout(() => {
-        copyBtn.innerHTML = `
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
-            <path d="m4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
-          </svg>
-          Copy
-        `;
-        copyBtn.style.color = '#374151';
+        icon.innerHTML = `<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>`;
+        text.textContent = 'Copy';
+        btn.style.color = 'var(--secondary-text-color)';
       }, 2000);
-    } catch (error) {
-      console.error('Failed to copy:', error);
-    }
-  });
-  
-  contentDiv.style.display = 'block';
-  summarizeBtn.style.display = 'block';
-}
+    });
+  }
 
-function showError(contentDiv, loadingDiv, summarizeBtn, errorMessage) {
-  loadingDiv.style.display = 'none';
-  
-  contentDiv.innerHTML = `
-    <div style="
-      background: #fef2f2;
-      border: 1px solid #fecaca;
-      border-radius: 8px;
-      padding: 16px;
-      text-align: center;
-    ">
+  function showError(contentDiv, loadingDiv, summarizeBtn, errorMessage) {
+    loadingDiv.style.display = 'none';
+    summarizeBtn.style.display = 'none';
+    contentDiv.innerHTML = `
       <div style="
-        font-size: 16px;
-        margin-bottom: 8px;
-      ">😔</div>
+        background: var(--error-bg-color); border: 1px solid var(--error-border-color);
+        border-radius: 12px; padding: 20px; text-align: center;">
+        <h4 style="color: var(--text-color); font-weight: 500; margin: 0 0 8px; font-size: 16px;">Hmm, a slight hiccup...</h4>
+        <p style="color: var(--error-text-color); font-size: 13px; margin: 0 0 16px; line-height: 1.5;">${errorMessage}</p>
+        <button id="retry-btn" style="
+          background: var(--button-bg-color); color: var(--text-color);
+          border:none; border-radius:8px; padding: 8px 16px;
+          font-size:13px; font-weight:500; cursor:pointer;">Try Again</button>
+      </div>
+    `;
+    contentDiv.style.display = 'block';
+    document.getElementById('retry-btn')?.addEventListener('click', () => {
+      const loadingMessage = document.getElementById('loading-message');
+      summarizeVideo(window.location.href, loadingMessage, contentDiv, loadingDiv, summarizeBtn);
+    });
+  }
+
+  function showRateLimitError(contentDiv, loadingDiv, summarizeBtn, errorData) {
+    loadingDiv.style.display = 'none';
+    summarizeBtn.style.display = 'none';
+    contentDiv.innerHTML = `
       <div style="
-        font-weight: 600; 
-        margin-bottom: 6px; 
-        font-size: 13px;
-        color: #dc2626;
-      ">Something went wrong</div>
-      <div style="
-        font-size: 12px; 
-        line-height: 1.4; 
-        color: #991b1b;
-        margin-bottom: 12px;
-        white-space: pre-wrap;
-        text-align: left;
-      ">${errorMessage}</div>
-      <button onclick="document.getElementById('summarize-video-btn').click()" style="
-        background: #f9fafb;
-        color: #374151;
-        border: 1px solid #d1d5db;
-        border-radius: 6px;
-        padding: 6px 12px;
-        font-size: 11px;
-        cursor: pointer;
-        font-weight: 500;
-        font-family: inherit;
-      ">🔄 Try Again</button>
-    </div>
-  `;
-  
-  contentDiv.style.display = 'block';
-  summarizeBtn.style.display = 'block';
-}
-
-function injectLikedVideosButtons() {
-  if (!window.location.href.includes('youtube.com/playlist?list=LL')) {
-    return;
+        background: var(--limit-bg-color); border: 1px solid var(--limit-border-color);
+        border-radius: 12px; padding: 20px; text-align: center;">
+        <div style="font-size: 24px; margin-bottom: 12px;">⏰</div>
+        <h4 style="color: var(--text-color); font-weight: 600; margin: 0 0 8px; font-size: 16px;">You're on a roll!</h4>
+        <p style="color: var(--limit-text-color); font-size: 13px; margin: 0 0 16px; line-height: 1.5;">${errorData.message}</p>
+        <button id="upgrade-btn" style="
+          width: 100%; background: #FBBF24; color: #78350F; border:none; border-radius:8px;
+          padding: 10px 16px; font-size:14px; font-weight:600; cursor:pointer;
+          display:flex; align-items:center; justify-content:center; gap: 8px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.243 13.06L12 18.028l-4.243-2.968C6.632 14.162 6 12.89 6 11.5c0-1.29.588-2.48 1.5-3.357C8.412 7.218 9.645 6.5 11 6.5c1.47 0 2.5.588 3.5 1.5.912.877 1.5 2.067 1.5 3.5 0 1.39-.632 2.662-1.757 3.56z"/></svg>
+          Upgrade to Pioneer Access
+        </button>
+      </div>
+    `;
+    contentDiv.style.display = 'block';
+    document.getElementById('upgrade-btn')?.addEventListener('click', () => {
+      const loadingMessage = document.getElementById('loading-message');
+      errorData.message = 'Pioneer Access is a limited-time offer coming soon to early supporters!';
+      showError(contentDiv, loadingDiv, summarizeBtn, errorData.message);
+    });
   }
 
-  const existingButtons = document.getElementById('youtube-enhancer-liked-buttons');
-  if (existingButtons) {
-    existingButtons.remove();
-  }
+  // --- Extension Initialization ---
+  function initializeExtension() {
+    console.log('YouTube Maestro: Initializing...');
 
-  // Wait for the playlist header to load
-  const playlistHeader = document.querySelector('#header.ytd-playlist-header-renderer');
-  if (!playlistHeader) {
-    setTimeout(injectLikedVideosButtons, 1000);
-    return;
-  }
+    const debounce = (func, wait) => {
+      let timeout;
+      return (...args) => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func(...args), wait);
+      };
+    };
 
-  const buttonContainer = document.createElement('div');
-  buttonContainer.id = 'youtube-enhancer-liked-buttons';
-  buttonContainer.innerHTML = `
-    <div style="
-      display: flex;
-      gap: 12px;
-      margin-top: 16px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', system-ui, sans-serif;
-    ">
-      <button id="fetch-liked-videos" style="
-        background: #f9fafb;
-        color: #374151;
-        border: 1px solid #d1d5db;
-        border-radius: 8px;
-        padding: 10px 16px;
-        font-size: 13px;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        font-family: inherit;
-      " onmouseover="this.style.background='#f3f4f6'" 
-         onmouseout="this.style.background='#f9fafb'">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-          <polyline points="7 10 12 15 17 10"/>
-          <line x1="12" y1="15" x2="12" y2="3"/>
-        </svg>
-        Fetch Videos
-      </button>
-      
-      <button id="export-liked-videos" style="
-        background: #f9fafb;
-        color: #374151;
-        border: 1px solid #d1d5db;
-        border-radius: 8px;
-        padding: 10px 16px;
-        font-size: 13px;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        font-family: inherit;
-      " onmouseover="this.style.background='#f3f4f6'" 
-         onmouseout="this.style.background='#f9fafb'">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-          <polyline points="17 8 12 3 7 8"/>
-          <line x1="12" y1="3" x2="12" y2="15"/>
-        </svg>
-        Export Data
-      </button>
-    </div>
-  `;
+    const handleNavigation = debounce((event) => {
+      if (isInjecting) return;
+      main(event);
+    }, 10);
 
-  playlistHeader.appendChild(buttonContainer);
+    document.addEventListener('yt-navigate-finish', handleNavigation, { passive: true });
 
-  // Add event listeners
-  document.getElementById('fetch-liked-videos')?.addEventListener('click', () => {
-    if (window.chrome?.runtime) {
-      window.chrome.runtime.sendMessage({ action: 'fetchLikedVideos' });
+    // Initial load handling - use debounced function to maintain consistency
+    if (document.readyState === 'interactive' || document.readyState === 'complete') {
+      setTimeout(() => handleNavigation(null), 100);
+    } else {
+      document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => handleNavigation(null), 100);
+      }, { once: true });
     }
-  });
-
-  document.getElementById('export-liked-videos')?.addEventListener('click', () => {
-    if (window.chrome?.runtime) {
-      window.chrome.runtime.sendMessage({ action: 'exportData' });
-    }
-  });
-}
-
-// Initialize based on page type
-function initializeExtension() {
-  if (window.location.href.includes('youtube.com/watch')) {
-    injectSummarizationPanel();
-  } else if (window.location.href.includes('youtube.com/playlist?list=LL')) {
-    injectLikedVideosButtons();
   }
-}
 
-// Initialize when page loads
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(initializeExtension, 2000);
-  });
-} else {
-  setTimeout(initializeExtension, 2000);
-}
+  initializeExtension();
 
-// Handle navigation changes
-let currentUrl = window.location.href;
-const observer = new MutationObserver(() => {
-  if (window.location.href !== currentUrl) {
-    currentUrl = window.location.href;
-    setTimeout(initializeExtension, 2000);
-  }
-});
-
-observer.observe(document.body, {
-  childList: true,
-  subtree: true
-});
-
-if (typeof chrome !== 'undefined' && chrome.runtime) {
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.action === 'showToast') {
-      // Handle any toast messages if needed
-    }
-    return true;
-  });
-}
+} // End of script execution guard

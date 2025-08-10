@@ -1,15 +1,23 @@
 
 :root {
-  --primary: #ea384c;
-  --primary-hover: #d31b31;
-  --secondary: #c81c2e;
-  --text-primary: #1A1F2C;
-  --text-secondary: #64748b;
+  --primary: #ff1744;
+  --primary-hover: #d50000;
+  --secondary: #c62828;
+  --text-primary: #000000;
+  --text-secondary: #666666;
   --background: #ffffff;
-  --background-secondary: #f8fafc;
-  --border: #e2e8f0;
+  --background-secondary: #f5f5f5;
+  --border: #e0e0e0;
   --radius: 8px;
   --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] {
+  --text-primary: #ffffff;
+  --text-secondary: #cccccc;
+  --background: #000000;
+  --background-secondary: #1a1a1a;
+  --border: #333333;
 }
 
 * {
@@ -25,6 +33,10 @@ body {
   padding: 0;
   background-color: var(--background);
   color: var(--text-primary);
+    /* --- ADD THESE LINES for the buffering error*/
+  visibility: hidden; /* Hide the body initially */
+  opacity: 0; /* Prepare for a fade-in effect */
+  transition: opacity 0.2s ease-in-out; /* Add a smooth transition */
 }
 
 #popup-container {
@@ -38,6 +50,7 @@ body {
   margin-bottom: 20px;
   padding-bottom: 16px;
   border-bottom: 1px solid var(--border);
+  position: relative;
 }
 
 .logo-wrapper {
@@ -125,6 +138,15 @@ body {
   justify-content: center;
   margin-right: 12px;
   color: white;
+  position: relative;
+  overflow: hidden;
+}
+
+.avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .avatar-initial {
@@ -268,4 +290,93 @@ body {
   10% { opacity: 1; }
   90% { opacity: 1; }
   100% { opacity: 0; }
+}
+
+/* Settings Dropdown Styles */
+.settings-container {
+  position: relative;
+}
+
+.settings-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-btn:hover {
+  background-color: var(--background-secondary);
+  color: var(--primary);
+  transform: rotate(90deg);
+}
+
+.settings-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  min-width: 200px;
+  box-shadow: var(--shadow);
+  z-index: 1000;
+  display: none;
+  margin-top: 4px;
+}
+
+.settings-dropdown.show {
+  display: block;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.dropdown-item {
+  margin-bottom: 12px;
+}
+
+.dropdown-item:last-child {
+  margin-bottom: 0;
+}
+
+.dropdown-item label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.language-select,
+.theme-select {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--background);
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.language-select:focus,
+.theme-select:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.language-select:hover,
+.theme-select:hover {
+  border-color: var(--primary);
 }

@@ -1,12 +1,46 @@
-
+// backend/server.js
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
+const { Pool } = require('pg');
 
-// Load environment variables FIRST - check multiple locations
+// 🌟🌟🌟 START: IMPORTANT - LOAD ENVIRONMENT VARIABLES FIRST 🌟🌟🌟
 require('dotenv').config();
 require('dotenv').config({ path: path.join(__dirname, '.env') });
+// 🌟🌟🌟 END: IMPORTANT - LOAD ENVIRONMENT VARIABLES FIRST 🌟🌟🌟
+
+// NEW: Import database initializer
+const DatabaseInitializer = require('./database/init');
+
+// Database connection configuration
+const pool = new Pool({
+   connectionString: process.env.DATABASE_URL,
+    ssl: false
+});
+
+// NEW: Initialize database initializer
+const dbInitializer = new DatabaseInitializer(pool);
+
+// Test the database connection and initialize schema when the server starts
+pool.connect()
+    .then(async (client) => {
+        console.log('✅ Connected to local PostgreSQL database!');
+        client.release();
+        
+        // NEW: Initialize database schema
+        try {
+            await dbInitializer.initializeDatabase();
+            await dbInitializer.healthCheck();
+        } catch (initError) {
+            console.error('❌ Database initialization failed:', initError.message);
+            console.error('💡 Make sure your PostgreSQL server is running and the database exists.');
+        }
+    })
+    .catch(err => {
+        console.error('❌ Error connecting to PostgreSQL database:', err.message);
+        console.error('💡 Please ensure your local PostgreSQL server is running and DATABASE_URL in .env is correct.');
+    });
 
 // Debug environment loading
 console.log('🔧 Environment loading debug:');
@@ -48,7 +82,22 @@ app.get('/health', (req, res) => {
 });
 
 // API routes
-app.use('/api/summary', summaryRoutes);
+// backend/server.js (only this snippet needs modification)
+
+// ... (top of file, after dotenv config and pool setup) ...
+const UserManager = require('./utils/userManager'); // Make sure path is correct!
+
+// NEW: Initialize userManager instance
+const userManager = new UserManager(pool);
+
+// ... (further down in the file) ...
+
+// API routes - IMPORTANT: Pass the userManager instance here
+app.use('/api/summary', summaryRoutes(pool, userManager));
+
+
+
+
 
 // Start server with error handling
 const server = app.listen(PORT, () => {

@@ -10,24 +10,38 @@ document.addEventListener('DOMContentLoaded', () => {
   const signOutButton = document.getElementById('sign-out');
   const userEmail = document.getElementById('user-email');
   const userInitial = document.getElementById('user-initial');
+  const userAvatar = document.getElementById('user-avatar');
+  const settingsButton = document.getElementById('settings-button');
+  const settingsDropdown = document.getElementById('settings-dropdown');
+  const themeSelect = document.getElementById('theme-select');
 
-  // Check if user is already authenticated
-  chrome.storage.local.get(['userToken', 'userInfo'], (result) => {
-    if (result.userToken && result.userInfo) {
+  // Initialize theme and language
+  initializeSettings();
+
+  // Check authentication status using background script validation
+  chrome.runtime.sendMessage({ action: 'checkAuth' }, (response) => {
+    if (response && response.success && response.userInfo) {
       loginContainer.style.display = 'none';
       featuresContainer.style.display = 'block';
       
-      if (result.userInfo.email) {
-        userEmail.textContent = result.userInfo.email;
-        userInitial.textContent = result.userInfo.email.charAt(0).toUpperCase();
-      } else if (result.userInfo.name) {
-        userEmail.textContent = result.userInfo.name;
-        userInitial.textContent = result.userInfo.name.charAt(0).toUpperCase();
-      }
+      displayUserInfo(response.userInfo);
     } else {
       loginContainer.style.display = 'block';
       featuresContainer.style.display = 'none';
+      
+      // --- THIS IS THE KEY CHANGE fr the error message for new users
+      // Only show the error message if the session has actually expired.
+      if (response && response.reason === 'EXPIRED_TOKEN') {
+        showErrorMessage('Your session has expired. Please sign in again.');
+      }
+      // For a 'NO_TOKEN' reason (new user), no error will be shown.
     }
+
+ // --- ADD THESE LINES to fix the buffering issue we talked about. //
+    // Reveal the body now that the correct view is set
+    document.body.style.visibility = 'visible';
+    document.body.style.opacity = '1';
+
   });
 
   // Login with YouTube
@@ -40,12 +54,8 @@ document.addEventListener('DOMContentLoaded', () => {
         loginContainer.style.display = 'none';
         featuresContainer.style.display = 'block';
         
-        if (response.userInfo && response.userInfo.email) {
-          userEmail.textContent = response.userInfo.email;
-          userInitial.textContent = response.userInfo.email.charAt(0).toUpperCase();
-        } else if (response.userInfo && response.userInfo.name) {
-          userEmail.textContent = response.userInfo.name;
-          userInitial.textContent = response.userInfo.name.charAt(0).toUpperCase();
+        if (response.userInfo) {
+          displayUserInfo(response.userInfo);
         }
       } else {
         showErrorMessage('Authentication failed. Please try again.');
@@ -67,8 +77,13 @@ document.addEventListener('DOMContentLoaded', () => {
       
       if (response && response.success) {
         showSuccessMessage(fetchVideosButton, `${response.count} videos fetched!`);
+      } else if (response && response.needsReauth) {
+        showErrorMessage('Your session has expired. Please sign in again.');
+        // Switch back to login view
+        loginContainer.style.display = 'block';
+        featuresContainer.style.display = 'none';
       } else {
-        showErrorMessage('Failed to fetch videos. Please try again.');
+        showErrorMessage(response?.error || 'Failed to fetch videos. Please try again.');
       }
     });
   });
@@ -91,8 +106,13 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (response && response.success) {
           showSuccessMessage(exportDataButton, `${response.count} videos exported!`);
+        } else if (response && response.needsReauth) {
+          showErrorMessage('Your session has expired. Please sign in again.');
+          // Switch back to login view
+          loginContainer.style.display = 'block';
+          featuresContainer.style.display = 'none';
         } else {
-          showErrorMessage('Export failed. Please try again.');
+          showErrorMessage(response?.error || 'Export failed. Please try again.');
           console.error('Export failed:', response?.error || 'Unknown error');
         }
       }, 1000);
@@ -117,13 +137,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Sign out
   signOutButton && signOutButton.addEventListener('click', () => {
-    chrome.storage.local.remove(['userToken', 'userInfo', 'likedVideos'], () => {
+    chrome.storage.local.remove(['userToken', 'userInfo', 'userId', 'tokenExpiry', 'likedVideos'], () => {
       loginContainer.style.display = 'block';
       featuresContainer.style.display = 'none';
     });
   });
   
   // Helper functions
+  function displayUserInfo(userInfo) {
+    if (userInfo.email) {
+      userEmail.textContent = userInfo.email;
+      userInitial.textContent = userInfo.email.charAt(0).toUpperCase();
+    } else if (userInfo.name) {
+      userEmail.textContent = userInfo.name;
+      userInitial.textContent = userInfo.name.charAt(0).toUpperCase();
+    }
+    
+    // Handle profile picture
+    if (userInfo.picture) {
+      userAvatar.src = userInfo.picture;
+      userAvatar.style.display = 'block';
+      userInitial.style.display = 'none';
+      
+      // Fallback to initials if image fails to load
+      userAvatar.onerror = () => {
+        userAvatar.style.display = 'none';
+        userInitial.style.display = 'block';
+      };
+    } else {
+      userAvatar.style.display = 'none';
+      userInitial.style.display = 'block';
+    }
+  }
+
   function showSuccessMessage(element, message) {
     const successMessage = document.createElement('div');
     successMessage.classList.add('success-message');
@@ -153,4 +199,55 @@ document.addEventListener('DOMContentLoaded', () => {
       errorMessage.remove();
     }, 5000);
   }
+
+  // Settings functionality
+  function initializeSettings() {
+    // Load saved settings
+    chrome.storage.local.get(['theme'], (result) => {
+      if (result.theme) {
+        themeSelect.value = result.theme;
+        applyTheme(result.theme);
+      } else {
+        // Default to auto theme
+        applyTheme('auto');
+      }
+    });
+  }
+
+  function applyTheme(theme) {
+    if (theme === 'auto') {
+      // Use system preference
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+    } else {
+      document.documentElement.setAttribute('data-theme', theme);
+    }
+  }
+
+  // Settings button toggle
+  settingsButton && settingsButton.addEventListener('click', (e) => {
+    e.stopPropagation();
+    settingsDropdown.classList.toggle('show');
+  });
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!settingsDropdown.contains(e.target) && !settingsButton.contains(e.target)) {
+      settingsDropdown.classList.remove('show');
+    }
+  });
+
+  // Theme change handler
+  themeSelect && themeSelect.addEventListener('change', (e) => {
+    const selectedTheme = e.target.value;
+    chrome.storage.local.set({ theme: selectedTheme });
+    applyTheme(selectedTheme);
+  });
+
+  // Listen for system theme changes
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+    if (themeSelect.value === 'auto') {
+      applyTheme('auto');
+    }
+  });
 });

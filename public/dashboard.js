@@ -10,13 +10,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const confirmationModal = document.getElementById('confirmation-modal');
   const cancelDeleteButton = document.getElementById('cancel-delete');
   const confirmDeleteButton = document.getElementById('confirm-delete');
-  const userEmail = document.getElementById('user-email');
-  const userInitial = document.getElementById('user-initial');
+  const userEmailElement = document.getElementById('dashboard-user-email'); // Changed ID
+  const userInitialElement = document.getElementById('dashboard-user-initial'); // Changed ID
+  const userAvatarElement = document.getElementById('dashboard-user-avatar'); // NEW element
   const loadMoreContainer = document.querySelector('.load-more-container');
   
   let videos = [];
   let selectedVideos = new Set();
   let isLoadingMore = false;
+  let totalVideosCount = 0;
+  let allVideosSelected = false;
+  let nextPageToken = null;
   
   // Initialize the dashboard
   init();
@@ -35,49 +39,133 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Initialize the dashboard
   function init() {
+    console.log('🚀 Initializing dashboard...');
+    
     // Load user info
     chrome.storage.local.get('userInfo', (result) => {
-      if (result.userInfo) {
-        if (result.userInfo.email) {
-          userEmail.textContent = result.userInfo.email;
-          userInitial.textContent = result.userInfo.email.charAt(0).toUpperCase();
-        } else if (result.userInfo.name) {
-          userEmail.textContent = result.userInfo.name;
-          userInitial.textContent = result.userInfo.name.charAt(0).toUpperCase();
-        } else {
-          userEmail.textContent = "Welcome back!";
-          userInitial.textContent = "👋";
+      console.log('👤 Loading user info:', result);
+if (result.userInfo) {
+        const userInfo = result.userInfo; // Store userInfo for easier access
+
+        // Display user email
+        if (userEmailElement) { // Use the new constant name
+          userEmailElement.textContent = userInfo.email || 'N/A';
+        }
+
+        // Handle profile picture and initial
+        if (userAvatarElement && userInitialElement) { // Use the new constant names
+          if (userInfo.picture) {
+            userAvatarElement.src = userInfo.picture;
+            userAvatarElement.style.display = 'block'; // Show the image
+            userInitialElement.style.display = 'none'; // Hide the initial
+            userInitialElement.textContent = ''; // Clear initial text
+
+            // Fallback to initials if image fails to load
+            userAvatarElement.onerror = () => {
+              userAvatarElement.style.display = 'none'; // Hide image if it fails
+              userInitialElement.style.display = 'block'; // Show initial instead
+              userInitialElement.textContent = userInfo.name ? userInfo.name.charAt(0).toUpperCase() : (userInfo.email ? userInfo.email.charAt(0).toUpperCase() : 'U'); // Set initial on error
+            };
+          } else {
+            // If no picture URL, hide image and show initial
+            userAvatarElement.style.display = 'none';
+            userInitialElement.style.display = 'block';
+            userInitialElement.textContent = userInfo.name ? userInfo.name.charAt(0).toUpperCase() : (userInfo.email ? userInfo.email.charAt(0).toUpperCase() : 'U');
+          }
+        } else if (userInitialElement) { // Fallback if only initial element exists (shouldn't happen with correct HTML)
+            userInitialElement.textContent = userInfo.name ? userInfo.name.charAt(0).toUpperCase() : (userInfo.email ? userInfo.email.charAt(0).toUpperCase() : 'U');
         }
       } else {
-        userEmail.textContent = "Welcome to Dashboard";
-        userInitial.textContent = "👋";
+        // Handle case where no user info is available (e.g., not signed in)
+        if (userEmailElement) {
+          userEmailElement.textContent = "Welcome to Dashboard";
+        }
+        if (userInitialElement) {
+          userInitialElement.textContent = "👋";
+        }
+        if (userAvatarElement) {
+          userAvatarElement.style.display = 'none';
+        }
       }
     });
     
     // Load videos
     chrome.storage.local.get(['likedVideos', 'nextPageToken', 'totalResults'], (result) => {
+      console.log('📺 Loading videos from storage:', result);
+      
       if (result.likedVideos && result.likedVideos.length > 0) {
         videos = result.likedVideos;
+        totalVideosCount = result.totalResults || videos.length;
+        nextPageToken = result.nextPageToken;
+        
+        console.log('✅ Found videos:', videos.length);
+        console.log('📊 Total videos available:', totalVideosCount);
+        console.log('🔗 Next page token:', nextPageToken ? 'Available' : 'None');
+        
+        // Add total count display
+        addTotalCountText();
+        
+        // CRITICAL: Videos are already in correct order from the playlist API - don't re-sort!
+        console.log('📋 Videos are in YouTube playlist order - preserving original order');
+        
         renderVideos();
         
-        if (result.totalResults) {
-          const totalCount = document.createElement('div');
-          totalCount.className = 'total-count';
-          totalCount.textContent = `Showing ${videos.length} of ${result.totalResults} videos`;
-          videoList.parentNode.insertBefore(totalCount, videoList);
-          
-          if (result.nextPageToken) {
-            addLoadMoreButton(result.nextPageToken);
-          }
+        // Add load more button if there are more videos to load
+        if (nextPageToken && videos.length < totalVideosCount) {
+          addLoadMoreButton(nextPageToken);
         }
+        
+        loadingElement.style.display = 'none';
       } else {
+        console.log('❌ No videos found in storage');
         loadingElement.style.display = 'none';
         noVideosElement.style.display = 'block';
+        noVideosElement.innerHTML = `
+          <h3>No videos found</h3>
+          <p>Your liked videos will appear here once fetched from the extension popup.</p>
+        `;
       }
     });
   }
   
-  // Function to add a load more button
+  // Add total count display with sync indicator
+  function addTotalCountText() {
+    // Remove existing total count if it exists
+    const existingCount = document.querySelector('.total-videos-text');
+    if (existingCount) {
+      existingCount.remove();
+    }
+    
+    const totalCountElement = document.createElement('div');
+    totalCountElement.className = 'total-videos-text';
+    totalCountElement.style.cssText = `
+      text-align: center;
+      font-size: 18px;
+      font-weight: 600;
+      color: #1f2937;
+      margin: 20px 0;
+      padding: 12px;
+      background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+    `;
+    
+    const displayCount = Math.max(totalVideosCount, videos.length);
+    const syncStatus = videos.length >= totalVideosCount ? '✅ Fully Synced' : `📥 ${videos.length}/${totalVideosCount} Loaded`;
+    
+    totalCountElement.innerHTML = `
+      <div>Total Liked Videos: ${displayCount.toLocaleString()}</div>
+      <div style="font-size: 14px; color: #6b7280; margin-top: 4px;">${syncStatus}</div>
+    `;
+    
+    // Insert before the dashboard header
+    const dashboardHeader = document.querySelector('.dashboard-header');
+    if (dashboardHeader) {
+      dashboardHeader.parentNode.insertBefore(totalCountElement, dashboardHeader);
+    }
+  }
+  
+  // ENHANCED: Function to add a load more button with better UX
   function addLoadMoreButton(pageToken) {
     const existingBtn = document.getElementById('load-more');
     if (existingBtn) {
@@ -87,22 +175,75 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadMoreBtn = document.createElement('button');
     loadMoreBtn.id = 'load-more';
     loadMoreBtn.className = 'secondary-button';
-    loadMoreBtn.textContent = 'Load More Videos';
+    loadMoreBtn.style.cssText = `
+      display: block;
+      margin: 32px auto;
+      padding: 16px 32px;
+      background: linear-gradient(135deg, #ffffff 0%, #fce4ec 100%);
+      border: 1px solid rgba(255, 23, 68, 0.1);
+      border-radius: 12px;
+      color: #FF1744;
+      font-weight: 600;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 12px rgba(255, 23, 68, 0.15);
+      position: relative;
+      overflow: hidden;
+    `;
+    
+    const remainingCount = Math.max(0, totalVideosCount - videos.length);
+    loadMoreBtn.innerHTML = `
+      <span>Load More Videos</span>
+      <div style="font-size: 14px; opacity: 0.9; margin-top: 4px;">
+        ${remainingCount.toLocaleString()} remaining of ${totalVideosCount.toLocaleString()} total
+      </div>
+    `;
+    
+    loadMoreBtn.addEventListener('mouseenter', () => {
+      loadMoreBtn.style.transform = 'translateY(-2px)';
+      loadMoreBtn.style.background = 'linear-gradient(135deg, #ffffff 0%, #f8bbd9 100%)';
+      loadMoreBtn.style.boxShadow = '0 6px 20px rgba(255, 23, 68, 0.25)';
+    });
+    
+    loadMoreBtn.addEventListener('mouseleave', () => {
+      loadMoreBtn.style.transform = 'translateY(0)';
+      loadMoreBtn.style.background = 'linear-gradient(135deg, #ffffff 0%, #fce4ec 100%)';
+      loadMoreBtn.style.boxShadow = '0 4px 12px rgba(255, 23, 68, 0.15)';
+    });
+    
     loadMoreBtn.addEventListener('click', () => loadMoreVideos(pageToken));
     
     loadMoreContainer.innerHTML = '';
     loadMoreContainer.appendChild(loadMoreBtn);
   }
   
-  // Function to load more videos using the nextPageToken
+  // ENHANCED: Function to load more videos with better error handling and UX
   function loadMoreVideos(pageToken) {
     if (isLoadingMore) return;
     
     const loadMoreBtn = document.getElementById('load-more');
-    if (loadMoreBtn) {
-      loadMoreBtn.disabled = true;
-      loadMoreBtn.textContent = 'Loading...';
-    }
+    if (!loadMoreBtn) return;
+    
+    // Show loading state
+    loadMoreBtn.disabled = true;
+    loadMoreBtn.style.opacity = '0.7';
+    loadMoreBtn.innerHTML = `
+      <div style="display: flex; align-items: center; justify-content: center;">
+        <div style="width: 20px; height: 20px; border: 2px solid #ffffff40; border-top: 2px solid #ffffff; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px;"></div>
+        Loading more videos...
+      </div>
+    `;
+    
+    // Add spinning animation
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    `;
+    document.head.appendChild(style);
     
     isLoadingMore = true;
     
@@ -113,81 +254,114 @@ document.addEventListener('DOMContentLoaded', () => {
       isLoadingMore = false;
       
       if (response && response.success) {
-        console.log("Successfully loaded more videos:", response);
+        console.log("✅ Successfully loaded more videos:", response);
         
-        videos = [...videos, ...response.videos];
+        // Add new videos to existing array (maintaining playlist order)
+        const newVideos = response.videos || [];
+        videos = [...videos, ...newVideos];
+        totalVideosCount = response.totalResults || totalVideosCount;
+        nextPageToken = response.nextPageToken;
         
-        chrome.storage.local.set({ 
-          likedVideos: videos,
-          nextPageToken: response.nextPageToken || null
-        });
+        // Save to storage - this is handled by the background script
         
+        // Update display
+        addTotalCountText();
         renderVideos();
         
-        if (response.nextPageToken) {
-          addLoadMoreButton(response.nextPageToken);
-        } else if (loadMoreBtn) {
+        // Update or remove load more button
+        if (nextPageToken && videos.length < totalVideosCount) {
+          addLoadMoreButton(nextPageToken);
+        } else {
           loadMoreBtn.remove();
+          
+          // Add completion message
+          const completionMsg = document.createElement('div');
+          completionMsg.style.cssText = `
+            text-align: center;
+            padding: 20px;
+            color: #10b981;
+            font-weight: 600;
+            font-size: 16px;
+          `;
+          completionMsg.textContent = `✅ All ${videos.length.toLocaleString()} liked videos loaded!`;
+          loadMoreContainer.appendChild(completionMsg);
         }
         
-        const totalCount = document.querySelector('.total-count');
-        if (totalCount) {
-          totalCount.textContent = `Showing ${videos.length} of ${response.totalResults || videos.length} videos`;
-        }
+        // Show success message
+        showToast(`Loaded ${newVideos.length} more videos! (${videos.length}/${totalVideosCount} total)`);
+        
       } else {
-        console.error("Failed to load more videos:", response?.error || "Unknown error");
-        if (loadMoreBtn) {
-          loadMoreBtn.disabled = false;
-          loadMoreBtn.textContent = 'Try Again';
-        }
+        console.error("❌ Failed to load more videos:", response?.error || "Unknown error");
         
-        const errorMessage = document.createElement('div');
-        errorMessage.className = 'error-message';
-        errorMessage.textContent = response?.error || 'Failed to load more videos. Please try again.';
-        errorMessage.style.color = '#ea384c';
-        errorMessage.style.marginTop = '16px';
-        errorMessage.style.textAlign = 'center';
+        // Restore button
+        loadMoreBtn.disabled = false;
+        loadMoreBtn.style.opacity = '1';
+        const remainingCount = Math.max(0, totalVideosCount - videos.length);
+        loadMoreBtn.innerHTML = `
+          <span>Load More Videos</span>
+          <div style="font-size: 14px; opacity: 0.9; margin-top: 4px;">
+            ${remainingCount.toLocaleString()} remaining of ${totalVideosCount.toLocaleString()} total
+          </div>
+        `;
         
-        const existingError = document.querySelector('.error-message');
-        if (existingError) {
-          existingError.remove();
-        }
-        
-        loadMoreContainer.appendChild(errorMessage);
-        
-        setTimeout(() => {
-          if (errorMessage.parentNode) {
-            errorMessage.remove();
-          }
-        }, 5000);
+        showToast('Failed to load more videos. Please try again.', 'error');
       }
+      
+      // Remove animation style
+      style.remove();
     });
   }
   
-  // Render videos based on search and filter
+  // CORRECTED: Render videos with proper sorting that respects YouTube's actual order
   function renderVideos() {
+    console.log('🎨 Rendering videos:', videos.length);
     videoList.innerHTML = '';
     
     const searchTerm = searchInput.value.toLowerCase();
     const filterValue = filterSelect.value;
     
     let filteredVideos = videos.filter(video => 
-      video.title.toLowerCase().includes(searchTerm) || 
-      video.channelTitle.toLowerCase().includes(searchTerm)
+      (video.title && video.title.toLowerCase().includes(searchTerm)) || 
+      (video.channelTitle && video.channelTitle.toLowerCase().includes(searchTerm))
     );
     
+    // CRITICAL: Apply sorting based on filter, but preserve original YouTube order when possible
     switch (filterValue) {
       case 'recent':
-        filteredVideos.sort((a, b) => new Date(b.likedAt) - new Date(a.likedAt));
+        // Keep original playlist order (most recently liked first) - this is already correct!
+        console.log('🔄 Keeping original YouTube playlist order (most recent first)');
         break;
       case 'oldest':
-        filteredVideos.sort((a, b) => new Date(a.likedAt) - new Date(b.likedAt));
+        // Reverse the playlist order to show oldest liked first
+        filteredVideos.reverse();
+        console.log('🔄 Reversed to show oldest liked first');
         break;
       case 'popular':
-        filteredVideos.sort((a, b) => parseInt(b.viewCount) - parseInt(a.viewCount));
+        // Sort by view count (highest first)
+        filteredVideos.sort((a, b) => {
+          const viewsA = parseInt(a.viewCount || 0);
+          const viewsB = parseInt(b.viewCount || 0);
+          return viewsB - viewsA; // Highest views first
+        });
+        console.log('🔄 Sorted by popularity (view count)');
         break;
       default:
-        filteredVideos.sort((a, b) => new Date(b.likedAt) - new Date(a.likedAt));
+        // Default: keep original YouTube playlist order
+        console.log('🔄 Using default YouTube playlist order');
+    }
+    
+    console.log(`🔍 Filtered and sorted ${filteredVideos.length} videos by: ${filterValue}`);
+    
+    if (filteredVideos.length === 0) {
+      if (searchTerm || filterValue !== 'all') {
+        noVideosElement.innerHTML = '<h3>No videos match your search or filter.</h3>';
+      } else {
+        noVideosElement.innerHTML = '<h3>No liked videos found.</h3><p>Try fetching videos from the extension popup first.</p>';
+      }
+      noVideosElement.style.display = 'block';
+      return;
+    } else {
+      noVideosElement.style.display = 'none';
     }
     
     filteredVideos.forEach(video => {
@@ -195,48 +369,47 @@ document.addEventListener('DOMContentLoaded', () => {
       videoList.appendChild(videoCard);
     });
     
-    loadingElement.style.display = 'none';
-    
-    if (filteredVideos.length === 0) {
-      if (searchTerm || filterValue !== 'all') {
-        noVideosElement.textContent = 'No videos match your search or filter.';
-      } else {
-        noVideosElement.textContent = 'No liked videos found. Try fetching videos first.';
-      }
-      noVideosElement.style.display = 'block';
-    } else {
-      noVideosElement.style.display = 'none';
-    }
+    console.log('✅ Rendered', filteredVideos.length, 'videos');
   }
   
-  // Create a video card element
+  // Create a video card element with ACCURATE date display
   function createVideoCard(video) {
     const card = document.createElement('div');
     card.className = 'video-card';
     card.dataset.id = video.id;
     
-    const likedDate = new Date(video.likedAt);
-    const formattedDate = likedDate.toLocaleDateString();
-    const viewCount = parseInt(video.viewCount).toLocaleString();
+    // ENHANCED: Use the accurate liked date from playlist API
+    const likedDate = new Date(video.likedAt || video.publishedAt || Date.now());
+    const isValidDate = !isNaN(likedDate.getTime());
+    
+    const formattedDate = isValidDate ? likedDate.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }) : 'Unknown date';
+    
+    const viewCount = parseInt(video.viewCount || 0).toLocaleString();
     
     card.innerHTML = `
       <div class="video-thumbnail">
-        <img src="${video.thumbnail}" alt="${video.title}">
+        <img src="${video.thumbnail || '/icons/BRAND3-removebg-preview.png'}" alt="${video.title || 'Video thumbnail'}" onerror="this.src='/icons/BRAND3-removebg-preview.png'">
         <div class="checkbox-container">
           <input type="checkbox" class="video-checkbox" data-id="${video.id}">
         </div>
       </div>
       <div class="video-details">
         <h3 class="video-title">
-          <a href="https://www.youtube.com/watch?v=${video.id}" target="_blank">${video.title}</a>
+          <a href="${video.url || `https://www.youtube.com/watch?v=${video.id}`}" target="_blank">${video.title || 'Unknown Title'}</a>
         </h3>
-        <div class="video-channel">${video.channelTitle}</div>
+        <div class="video-channel">${video.channelTitle || 'Unknown Channel'}</div>
         <div class="video-meta">
           <span>${viewCount} views</span>
           <span>Liked on ${formattedDate}</span>
         </div>
         <div class="video-actions">
-          <button class="download-button" data-id="${video.id}" data-title="${video.title}">
+          <button class="download-button" data-id="${video.id}" data-title="${video.title || 'video'}">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               <path d="M7 10L12 15L17 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -252,7 +425,7 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
     
     const downloadButton = card.querySelector('.download-button');
-    downloadButton.addEventListener('click', () => downloadVideo(video.id, video.title));
+    downloadButton.addEventListener('click', () => downloadVideo(video.id, video.title || 'video'));
     
     const deleteButton = card.querySelector('.delete-button');
     deleteButton.addEventListener('click', () => deleteVideo(video.id));
@@ -263,6 +436,7 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedVideos.add(video.id);
       } else {
         selectedVideos.delete(video.id);
+        allVideosSelected = false;
       }
       updateSelectionCount();
     });
@@ -289,155 +463,14 @@ document.addEventListener('DOMContentLoaded', () => {
     downloadBtn.disabled = true;
     
     const sanitizedTitle = videoTitle.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
-    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
     
     try {
-      // Method 1: Try using a CORS-enabled API
-      await tryDirectDownload(videoId, sanitizedTitle);
-    } catch (error) {
-      console.log('Direct download failed, trying alternative method...');
-      
-      try {
-        // Method 2: Try using youtube-dl-web service
-        await tryYoutubeDLWeb(videoUrl, sanitizedTitle);
-      } catch (error2) {
-        console.log('Alternative method failed, using fallback...');
-        
-        // Method 3: Create a downloadable link using iframe method
-        await tryIframeMethod(videoId, sanitizedTitle);
-      }
-    } finally {
-      downloadBtn.innerHTML = originalText;
-      downloadBtn.disabled = false;
-    }
-  }
-  
-  // Method 1: Direct API download
-  async function tryDirectDownload(videoId, title) {
-    const response = await fetch(`https://api.cobalt.tools/api/json`, {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        url: `https://www.youtube.com/watch?v=${videoId}`,
-        vQuality: '720',
-        vFormat: 'mp4',
-        isAudioOnly: false
-      })
-    });
-    
-    const data = await response.json();
-    
-    if (data.status === 'success' && data.url) {
-      const link = document.createElement('a');
-      link.href = data.url;
-      link.download = `${title}.mp4`;
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      showToast('Video download started!');
-      return;
-    }
-    
-    throw new Error('Direct download failed');
-  }
-  
-  // Method 2: YouTube-DL Web service
-  async function tryYoutubeDLWeb(videoUrl, title) {
-    const response = await fetch('https://youtube-dl-web.herokuapp.com/api/download', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        url: videoUrl,
-        format: 'mp4'
-      })
-    });
-    
-    const data = await response.json();
-    
-    if (data.success && data.download_url) {
-      const link = document.createElement('a');
-      link.href = data.download_url;
-      link.download = `${title}.mp4`;
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      showToast('Video download started!');
-      return;
-    }
-    
-    throw new Error('YouTube-DL web failed');
-  }
-  
-  // Method 3: Iframe extraction method
-  async function tryIframeMethod(videoId, title) {
-    try {
-      // Create a hidden iframe to extract video sources
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      iframe.src = `https://www.youtube.com/embed/${videoId}`;
-      document.body.appendChild(iframe);
-      
-      // Wait for iframe to load
-      await new Promise(resolve => {
-        iframe.onload = resolve;
-        setTimeout(resolve, 3000); // Fallback timeout
-      });
-      
-      // Try to extract video URL from iframe (this is a simplified approach)
-      // In reality, this would require more complex extraction
-      
-      document.body.removeChild(iframe);
-      
-      // Fallback: Use a public video downloader service embedded
-      const downloadUrl = `https://yt1s.com/api/ajaxSearch/index`;
-      const formData = new FormData();
-      formData.append('q', `https://www.youtube.com/watch?v=${videoId}`);
-      formData.append('vt', 'mp4');
-      
-      const response = await fetch(downloadUrl, {
-        method: 'POST',
-        body: formData
-      });
-      
-      const data = await response.json();
-      
-      if (data.status === 'ok' && data.mess) {
-        // Parse the response to get download links
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(data.mess, 'text/html');
-        const downloadLink = doc.querySelector('a[href*="download"]');
-        
-        if (downloadLink) {
-          const link = document.createElement('a');
-          link.href = downloadLink.href;
-          link.download = `${title}.mp4`;
-          link.style.display = 'none';
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          
-          showToast('Video download started!');
-          return;
-        }
-      }
-      
-      throw new Error('Iframe method failed');
-    } catch (error) {
       // Final fallback - open in new tab with instructions
       const blob = new Blob([`
         <!DOCTYPE html>
         <html>
         <head>
-          <title>Download ${title}</title>
+          <title>Download ${videoTitle}</title>
           <style>
             body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
             .download-box { background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0; }
@@ -446,7 +479,7 @@ document.addEventListener('DOMContentLoaded', () => {
           </style>
         </head>
         <body>
-          <h1>Download: ${title}</h1>
+          <h1>Download: ${videoTitle}</h1>
           <div class="download-box">
             <p>Click one of the links below to download your video:</p>
             <a href="https://yt1s.com/youtube/${videoId}" target="_blank" class="btn">Download via YT1S</a>
@@ -461,7 +494,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${title}_download_options.html`;
+      link.download = `${sanitizedTitle}_download_options.html`;
       link.style.display = 'none';
       document.body.appendChild(link);
       link.click();
@@ -469,19 +502,23 @@ document.addEventListener('DOMContentLoaded', () => {
       URL.revokeObjectURL(url);
       
       showToast('Download options file created! Check your downloads folder.');
+    } finally {
+      downloadBtn.innerHTML = originalText;
+      downloadBtn.disabled = false;
     }
   }
   
   // Show toast notification
-  function showToast(message) {
+  function showToast(message, type = 'success') {
     const toast = document.createElement('div');
     toast.className = 'toast-notification';
     toast.textContent = message;
+    const bgColor = type === 'error' ? '#ef4444' : '#10b981';
     toast.style.cssText = `
       position: fixed;
       top: 20px;
       right: 20px;
-      background: #10b981;
+      background: ${bgColor};
       color: white;
       padding: 12px 20px;
       border-radius: 8px;
@@ -509,45 +546,95 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 3000);
   }
   
-  // Delete a single video
+  // ENHANCED: Delete a single video from YouTube and update counts
   function deleteVideo(videoId) {
+    console.log('🗑️ Deleting video from YouTube:', videoId);
+    
+    // Show loading state
+    const deleteBtn = document.querySelector(`[data-id="${videoId}"].delete-button`);
+    const originalText = deleteBtn.innerHTML;
+    deleteBtn.innerHTML = 'Removing...';
+    deleteBtn.disabled = true;
+    
     chrome.runtime.sendMessage({ action: 'deleteVideo', videoId }, (response) => {
+      deleteBtn.innerHTML = originalText;
+      deleteBtn.disabled = false;
+      
       if (response && response.success) {
+        // Remove from local array and update counts
         videos = videos.filter(video => video.id !== videoId);
         selectedVideos.delete(videoId);
+        
+        // Update total count
+        totalVideosCount = Math.max(0, totalVideosCount - 1);
+        
+        // Update storage
+        chrome.storage.local.set({ 
+          likedVideos: videos,
+          totalResults: totalVideosCount,
+          nextPageToken: nextPageToken
+        });
+        
+        // Update UI
+        addTotalCountText();
         updateSelectionCount();
         renderVideos();
+        
+        showToast('Video removed from YouTube and your list');
       } else {
-        alert('Failed to delete video. Please try again.');
+        console.error('Failed to delete video:', response?.error);
+        showToast('Failed to remove video from YouTube. Please try again.', 'error');
       }
     });
   }
   
-  // Toggle select all videos
+  // FIXED: Toggle select all videos with proper toggle behavior
   function toggleSelectAll() {
     const checkboxes = document.querySelectorAll('.video-checkbox');
-    const allSelected = checkboxes.length === selectedVideos.size;
     
-    if (allSelected) {
+    if (allVideosSelected) {
+      // Deselect all
       selectedVideos.clear();
       checkboxes.forEach(checkbox => {
         checkbox.checked = false;
       });
+      allVideosSelected = false;
+      selectAllButton.textContent = 'Select All';
     } else {
+      // Select all
       checkboxes.forEach(checkbox => {
         checkbox.checked = true;
         selectedVideos.add(checkbox.getAttribute('data-id'));
       });
+      allVideosSelected = true;
+      selectAllButton.textContent = 'Deselect All';
     }
     
     updateSelectionCount();
   }
   
-  // Update selection count
+  // Update selection count with proper toggle state management
   function updateSelectionCount() {
     const count = selectedVideos.size;
+    const totalVisible = document.querySelectorAll('.video-checkbox').length;
+    
     selectionCountElement.textContent = `${count} video${count !== 1 ? 's' : ''} selected`;
     deleteSelectedButton.disabled = count === 0;
+    
+    // Update select all button text based on selection state
+    if (count === totalVisible && totalVisible > 0) {
+      allVideosSelected = true;
+      selectAllButton.textContent = 'Deselect All';
+    } else {
+      allVideosSelected = false;
+      selectAllButton.textContent = 'Select All';
+    }
+    
+    // Show/hide sticky bottom bar
+    const stickyBar = document.querySelector('.sticky-bottom-bar');
+    if (stickyBar) {
+      stickyBar.style.display = count > 0 ? 'flex' : 'none';
+    }
   }
   
   // Show delete confirmation modal
@@ -562,36 +649,59 @@ document.addEventListener('DOMContentLoaded', () => {
     confirmationModal.style.display = 'none';
   }
   
-  // Delete selected videos
+  // Delete selected videos from YouTube and local storage
   function deleteSelectedVideos() {
     const totalToDelete = selectedVideos.size;
-    let deleted = 0;
-    let failed = 0;
-    
     const videoIds = Array.from(selectedVideos);
     
     hideDeleteConfirmation();
     
-    loadingElement.textContent = 'Deleting selected videos...';
-    loadingElement.style.display = 'block';
+    console.log('🗑️ Deleting selected videos from YouTube:', videoIds);
     
+    // Show loading state
+    loadingElement.style.display = 'block';
+    loadingElement.textContent = `Removing ${totalToDelete} videos from YouTube...`;
+    
+    let deletedCount = 0;
+    let failedCount = 0;
+    
+    // Delete each video from YouTube
     videoIds.forEach(videoId => {
       chrome.runtime.sendMessage({ action: 'deleteVideo', videoId }, (response) => {
         if (response && response.success) {
-          deleted++;
+          deletedCount++;
         } else {
-          failed++;
+          failedCount++;
+          console.error(`Failed to delete video ${videoId}:`, response?.error);
         }
         
-        if (deleted + failed === totalToDelete) {
-          videos = videos.filter(video => !selectedVideos.has(video.id));
+        // Check if all deletions are complete
+        if (deletedCount + failedCount === totalToDelete) {
+          // Remove successfully deleted videos from local array
+          videos = videos.filter(video => !videoIds.includes(video.id) || failedCount > 0);
+          
+          // Update storage
+          chrome.storage.local.set({ 
+            likedVideos: videos,
+            totalResults: Math.max(0, totalVideosCount - deletedCount)
+          });
+          
+          // Update total count
+          totalVideosCount = Math.max(0, totalVideosCount - deletedCount);
+          addTotalCountText();
+          
+          // Clear selection and update UI
           selectedVideos.clear();
+          allVideosSelected = false;
           updateSelectionCount();
-          loadingElement.style.display = 'none';
           renderVideos();
           
-          if (failed > 0) {
-            alert(`Successfully removed ${deleted} videos. Failed to remove ${failed} videos.`);
+          loadingElement.style.display = 'none';
+          
+          if (failedCount === 0) {
+            showToast(`Successfully removed ${deletedCount} video${deletedCount !== 1 ? 's' : ''} from YouTube`);
+          } else {
+            showToast(`Removed ${deletedCount} videos, ${failedCount} failed`, 'error');
           }
         }
       });
