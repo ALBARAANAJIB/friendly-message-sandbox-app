@@ -1,4 +1,3 @@
-
 :root {
   --primary: #ff1744;
   --primary-hover: #d50000;
@@ -10,6 +9,10 @@
   --border: #e0e0e0;
   --radius: 8px;
   --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  
+  /* --- FIX: Added variables for the neutral button states --- */
+  --button-neutral-bg: white;
+  --button-neutral-bg-hover: rgba(0, 0, 0, 0.05);
 }
 
 [data-theme="dark"] {
@@ -18,6 +21,10 @@
   --background: #000000;
   --background-secondary: #1a1a1a;
   --border: #333333;
+
+  /* --- FIX: Added dark theme values for the new variables --- */
+  --button-neutral-bg: rgba(255, 255, 255, 0.1);
+  --button-neutral-bg-hover: rgba(255, 255, 255, 0.2);
 }
 
 * {
@@ -227,7 +234,8 @@ body {
 
 .feature-btn {
   align-self: flex-start;
-  background-color: white;
+  /* --- FIX: Replaced hardcoded color with a theme-aware variable --- */
+  background-color: var(--button-neutral-bg);
   border: none;
   padding: 6px 12px;
   border-radius: 4px;
@@ -244,11 +252,8 @@ body {
 }
 
 .feature-btn:hover {
-  background-color: rgba(0, 0, 0, 0.05);
-}
-
-[data-theme="dark"] .feature-btn:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+  /* --- FIX: Replaced hardcoded color with a theme-aware variable --- */
+  background-color: var(--button-neutral-bg-hover);
 }
 
 .feature-card.primary .feature-btn:hover {
