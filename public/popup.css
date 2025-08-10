@@ -247,6 +247,10 @@ body {
   background-color: rgba(0, 0, 0, 0.05);
 }
 
+[data-theme="dark"] .feature-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
 .feature-card.primary .feature-btn:hover {
   background-color: rgba(255, 255, 255, 0.3);
 }
