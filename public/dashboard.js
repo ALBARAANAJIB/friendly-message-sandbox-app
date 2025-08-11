@@ -151,12 +151,13 @@ if (result.userInfo) {
       text-align: center;
       font-size: 18px;
       font-weight: 600;
-      color: #1f2937;
+      color: var(--text-primary);
       margin: 20px 0;
       padding: 12px;
-      background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+      background: var(--bg-gradient-primary);
       border-radius: 8px;
-      border: 1px solid #d1d5db;
+      border: 1px solid var(--border-primary);
+      transition: all 0.3s ease;
     `;
     
     const displayCount = Math.max(totalVideosCount, videos.length);
@@ -164,7 +165,7 @@ if (result.userInfo) {
     
     totalCountElement.innerHTML = `
       <div>Total Liked Videos: ${displayCount.toLocaleString()}</div>
-      <div style="font-size: 14px; color: #6b7280; margin-top: 4px;">${syncStatus}</div>
+      <div style="font-size: 14px; color: var(--text-secondary); margin-top: 4px; transition: color 0.3s ease;">${syncStatus}</div>
     `;
     
     // Insert before the dashboard header
@@ -188,15 +189,15 @@ if (result.userInfo) {
       display: block;
       margin: 32px auto;
       padding: 16px 32px;
-      background: linear-gradient(135deg, #ffffff 0%, #fce4ec 100%);
-      border: 1px solid rgba(255, 23, 68, 0.1);
+      background: var(--bg-gradient-load-more);
+      border: 1px solid var(--border-primary);
       border-radius: 12px;
-      color: #FF1744;
+      color: var(--text-danger);
       font-weight: 600;
       font-size: 16px;
       cursor: pointer;
       transition: all 0.3s ease;
-      box-shadow: 0 4px 12px rgba(255, 23, 68, 0.15);
+      box-shadow: var(--shadow-button);
       position: relative;
       overflow: hidden;
     `;
@@ -211,14 +212,14 @@ if (result.userInfo) {
     
     loadMoreBtn.addEventListener('mouseenter', () => {
       loadMoreBtn.style.transform = 'translateY(-2px)';
-      loadMoreBtn.style.background = 'linear-gradient(135deg, #ffffff 0%, #f8bbd9 100%)';
-      loadMoreBtn.style.boxShadow = '0 6px 20px rgba(255, 23, 68, 0.25)';
+      loadMoreBtn.style.background = 'var(--bg-gradient-load-more-hover)';
+      loadMoreBtn.style.boxShadow = 'var(--shadow-button-hover)';
     });
     
     loadMoreBtn.addEventListener('mouseleave', () => {
       loadMoreBtn.style.transform = 'translateY(0)';
-      loadMoreBtn.style.background = 'linear-gradient(135deg, #ffffff 0%, #fce4ec 100%)';
-      loadMoreBtn.style.boxShadow = '0 4px 12px rgba(255, 23, 68, 0.15)';
+      loadMoreBtn.style.background = 'var(--bg-gradient-load-more)';
+      loadMoreBtn.style.boxShadow = 'var(--shadow-button)';
     });
     
     loadMoreBtn.addEventListener('click', () => loadMoreVideos(pageToken));
@@ -288,9 +289,10 @@ if (result.userInfo) {
           completionMsg.style.cssText = `
             text-align: center;
             padding: 20px;
-            color: #10b981;
+            color: var(--text-success);
             font-weight: 600;
             font-size: 16px;
+            transition: color 0.3s ease;
           `;
           completionMsg.textContent = `✅ All ${videos.length.toLocaleString()} liked videos loaded!`;
           loadMoreContainer.appendChild(completionMsg);
