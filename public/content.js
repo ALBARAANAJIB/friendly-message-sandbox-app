@@ -211,6 +211,7 @@ async function injectSummarizationPanel() {
         #summarize-video-btn { width: 100%; background: var(--button-bg-color); color: var(--text-color); border: none; margin-top: 16px; border-radius: 18px; padding: 10px 16px; font-size: 14px; font-weight: 500; cursor: pointer; transition: background-color 0.2s ease; display: flex; align-items: center; justify-content: center; gap: 8px; }
         #summarize-video-btn:hover { background: var(--button-hover-bg-color); }
         .enhancer-loader { width: 24px; height: 24px; margin: 0 auto 16px; border: 2px solid var(--accent-color); border-bottom-color: transparent; border-radius: 50%; animation: enhancer-rotation 1s linear infinite; }
+        #loading-message { text-align: center; color: var(--secondary-text-color); font-size: 14px; margin-top: 8px; }
         @keyframes enhancer-rotation { 100% { transform: rotate(360deg); } }
       </style>
     `;
