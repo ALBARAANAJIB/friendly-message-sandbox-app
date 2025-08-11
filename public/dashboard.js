@@ -24,6 +24,9 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Initialize the dashboard
   init();
+  
+  // Initialize theme
+  initTheme();
 
   // Event listeners for search and filter
   searchInput.addEventListener('input', renderVideos);
@@ -36,6 +39,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // Event listeners for modal
   cancelDeleteButton.addEventListener('click', hideDeleteConfirmation);
   confirmDeleteButton.addEventListener('click', deleteSelectedVideos);
+  
+  // Event listener for theme toggle
+  const themeToggle = document.getElementById('theme-toggle');
+  if (themeToggle) {
+    themeToggle.addEventListener('click', toggleTheme);
+  }
   
   // Initialize the dashboard
   function init() {
@@ -707,4 +716,98 @@ if (result.userInfo) {
       });
     });
   }
+  
+  // ENHANCED: Function to show toast notifications
+  function showToast(message, type = 'success') {
+    // Remove existing toasts
+    const existingToasts = document.querySelectorAll('.toast-notification');
+    existingToasts.forEach(toast => toast.remove());
+    
+    const toast = document.createElement('div');
+    toast.className = `toast-notification ${type}`;
+    toast.textContent = message;
+    
+    document.body.appendChild(toast);
+    
+    // Show toast
+    setTimeout(() => {
+      toast.style.transform = 'translateX(0)';
+    }, 100);
+    
+    // Hide toast after 3 seconds
+    setTimeout(() => {
+      toast.style.transform = 'translateX(100%)';
+      setTimeout(() => {
+        if (toast.parentNode) {
+          toast.remove();
+        }
+      }, 300);
+    }, 3000);
+  }
+  
+  // Theme Management Functions
+  function initTheme() {
+    // Get saved theme preference or default to auto
+    const savedTheme = localStorage.getItem('dashboard-theme') || 'auto';
+    applyTheme(savedTheme);
+    updateThemeButton(savedTheme);
+  }
+  
+  function toggleTheme() {
+    const currentTheme = localStorage.getItem('dashboard-theme') || 'auto';
+    const themes = ['auto', 'light', 'dark'];
+    const currentIndex = themes.indexOf(currentTheme);
+    const nextTheme = themes[(currentIndex + 1) % themes.length];
+    
+    localStorage.setItem('dashboard-theme', nextTheme);
+    applyTheme(nextTheme);
+    updateThemeButton(nextTheme);
+  }
+  
+  function applyTheme(theme) {
+    const html = document.documentElement;
+    
+    if (theme === 'auto') {
+      // Remove theme attribute to use system preference
+      html.removeAttribute('data-theme');
+      
+      // Check system preference
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (prefersDark) {
+        html.setAttribute('data-theme', 'dark');
+      }
+    } else {
+      html.setAttribute('data-theme', theme);
+    }
+  }
+  
+  function updateThemeButton(theme) {
+    const themeToggle = document.getElementById('theme-toggle');
+    if (!themeToggle) return;
+    
+    const icons = {
+      auto: `<svg class="theme-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+               <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="2"/>
+               <path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="2"/>
+             </svg>`,
+      light: `<svg class="theme-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="2"/>
+                <path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="2"/>
+              </svg>`,
+      dark: `<svg class="theme-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+               <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" stroke-width="2"/>
+             </svg>`
+    };
+    
+    themeToggle.innerHTML = icons[theme];
+    themeToggle.title = `Theme: ${theme.charAt(0).toUpperCase() + theme.slice(1)}`;
+  }
+  
+  // Listen for system theme changes when in auto mode
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    const currentTheme = localStorage.getItem('dashboard-theme') || 'auto';
+    if (currentTheme === 'auto') {
+      applyTheme('auto');
+    }
+  });
 });
