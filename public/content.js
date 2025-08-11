@@ -387,8 +387,16 @@ async function injectSummarizationPanel() {
           color: var(--text-color); font-weight: bold;
         }
         .highlight {
-          color: var(--text-color); background-color: var(--limit-bg-color);
-          padding: 1px 4px; border-radius: 4px; font-weight: 500;
+          color: var(--text-color);
+          background-color: rgba(254, 240, 138, 0.4);; /* A light yellow for light mode */
+          padding: 1px 4px;
+          border-radius: 4px;
+          font-weight: 500;
+        }
+        
+        #enhancer-container[data-theme="dark"] .highlight {
+           background-color: rgba(113, 63, 18, 0.35);; /* A light blue for dark mode */
+            color: #fef3c7; /* A bright cyan text color for dark mode */
         }
         #copy-summary-btn:hover { background: var(--button-hover-bg-color) !important; color: var(--text-color); }
       </style>

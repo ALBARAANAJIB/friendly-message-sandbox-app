@@ -12,6 +12,13 @@ function getYouTubeVideoId(url) {
     return (match && match[1]) ? match[1] : null;
 }
 
+function getYouTubeVideoId(url) {
+    const regExp = /(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+    const match = url.match(regExp);
+    return (match && match[1]) ? match[1] : null;
+}
+
+// --- MODIFIED FUNCTION ---
 function createUniversalPrompt(transcriptText, videoLanguage = 'English') {
     return `You are a brilliant summarizer who creates visually engaging and comprehensive summaries for a modern audience. Your summaries are structured with emojis and bolded keywords to make them highly scannable, informative, and valuable.
 

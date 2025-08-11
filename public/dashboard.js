@@ -783,33 +783,27 @@ if (result.userInfo) {
     }
   }
   
-  function updateThemeButton(theme) {
+function updateThemeButton(theme) {
     const themeToggle = document.getElementById('theme-toggle');
     if (!themeToggle) return;
-    
-    const icons = {
-      auto: `<svg class="theme-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-               <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="2"/>
-               <path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="2"/>
-             </svg>`,
-      light: `<svg class="theme-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="2"/>
-                <path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="2"/>
-              </svg>`,
-      dark: `<svg class="theme-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-               <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" stroke-width="2"/>
-             </svg>`
-    };
-    
-    themeToggle.innerHTML = icons[theme];
+
+    let effectiveTheme = theme;
+    if (theme === 'auto') {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        effectiveTheme = prefersDark ? 'dark' : 'light';
+    }
+
+    // Set a data-attribute on the button itself. CSS will handle the animation.
+    themeToggle.dataset.theme = effectiveTheme;
     themeToggle.title = `Theme: ${theme.charAt(0).toUpperCase() + theme.slice(1)}`;
-  }
+}
   
   // Listen for system theme changes when in auto mode
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
     const currentTheme = localStorage.getItem('dashboard-theme') || 'auto';
     if (currentTheme === 'auto') {
-      applyTheme('auto');
+        applyTheme('auto');
+        updateThemeButton('auto'); // Make sure to update the button icon too
     }
   });
 });

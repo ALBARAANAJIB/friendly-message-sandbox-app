@@ -1,3 +1,4 @@
+/* In dashboard.css (Full Corrected File) */
 
 /* Dark Mode Variables */
 :root {
@@ -16,7 +17,7 @@
   --bg-gradient-primary: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
   --bg-gradient-load-more: linear-gradient(135deg, #ffffff 0%, #fce4ec 100%);
   --bg-gradient-load-more-hover: linear-gradient(135deg, #ffffff 0%, #f8bbd9 100%);
-  
+
   --text-primary: #333333;
   --text-secondary: #666666;
   --text-muted: #888888;
@@ -27,7 +28,7 @@
   --text-danger: #dc2626;
   --text-success: #10b981;
   --text-loading: #666666;
-  
+
   --border-primary: #e5e7eb;
   --border-secondary: #f0f0f0;
   --border-input: #e5e7eb;
@@ -35,7 +36,7 @@
   --border-card: #f0f0f0;
   --border-danger: #fed7d7;
   --border-download: #e2e8f0;
-  
+
   --shadow-card: 0 2px 10px rgba(0,0,0,0.05);
   --shadow-card-hover: 0 4px 20px rgba(0,0,0,0.1);
   --shadow-container: 0 0 20px rgba(0,0,0,0.05);
@@ -43,7 +44,7 @@
   --shadow-modal: 0 20px 60px rgba(0,0,0,0.3);
   --shadow-button: 0 4px 12px rgba(255, 23, 68, 0.15);
   --shadow-button-hover: 0 6px 20px rgba(255, 23, 68, 0.25);
-  
+
   --checkbox-bg: rgba(0,0,0,0.7);
   --overlay-bg: rgba(0,0,0,0.5);
   --focus-ring: rgba(220, 38, 38, 0.1);
@@ -65,7 +66,7 @@
   --bg-gradient-primary: linear-gradient(135deg, #2a2a2a 0%, #3a3a3a 100%);
   --bg-gradient-load-more: linear-gradient(135deg, #2a2a2a 0%, #3a3a3a 100%);
   --bg-gradient-load-more-hover: linear-gradient(135deg, #3a3a3a 0%, #4a4a4a 100%);
-  
+
   --text-primary: #ffffff;
   --text-secondary: #cccccc;
   --text-muted: #999999;
@@ -76,7 +77,7 @@
   --text-danger: #ff6b6b;
   --text-success: #4ade80;
   --text-loading: #cccccc;
-  
+
   --border-primary: #3a3a3a;
   --border-secondary: #4a4a4a;
   --border-input: #3a3a3a;
@@ -84,7 +85,7 @@
   --border-card: #3a3a3a;
   --border-danger: #5a1a1a;
   --border-download: #3a3a3a;
-  
+
   --shadow-card: 0 2px 10px rgba(0,0,0,0.5);
   --shadow-card-hover: 0 4px 20px rgba(0,0,0,0.6);
   --shadow-container: 0 0 20px rgba(0,0,0,0.3);
@@ -92,7 +93,7 @@
   --shadow-modal: 0 20px 60px rgba(0,0,0,0.7);
   --shadow-button: 0 4px 12px rgba(255, 107, 107, 0.3);
   --shadow-button-hover: 0 6px 20px rgba(255, 107, 107, 0.4);
-  
+
   --checkbox-bg: rgba(0,0,0,0.9);
   --overlay-bg: rgba(0,0,0,0.8);
   --focus-ring: rgba(255, 107, 107, 0.2);
@@ -122,11 +123,14 @@ body {
   transition: background-color 0.3s ease, box-shadow 0.3s ease;
 }
 
-/* Header Styles */
+/* ======================================= */
+/* === CORRECTED HEADER & THEME STYLES === */
+/* ======================================= */
+
 header {
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-primary);
-  padding: 20px 30px;
+  padding: 16px 30px;
   transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
@@ -143,94 +147,120 @@ header {
 }
 
 .logo {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: 8px;
 }
 
 .logo-container h1 {
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 600;
   margin: 0;
   color: var(--text-primary);
   transition: color 0.3s ease;
 }
 
+/* This new wrapper correctly aligns everything on the right */
+.header-right-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 20px; /* Space between user info and theme button */
+}
+
 .user-info {
   display: flex;
   align-items: center;
-  gap: 10px; /* Space between avatar/initial and email */
+  gap: 12px;
 }
 
-.user-info .avatar { /* More specific selector to ensure it applies */
-  display: flex; /* Use flexbox to center content inside the avatar div */
+.user-info .avatar {
+  display: flex;
   justify-content: center;
   align-items: center;
-  width: 36px; /* Size of the avatar container */
+  width: 36px;
   height: 36px;
-  border-radius: 50%; /* Make it round */
-  background-color: #007bff; /* Default background for initials (changed from red for a softer look, but you can change back to #dc2626 if you prefer) */
-  color: white; /* Color for initials */
-  font-weight: bold; /* Bold text for initials */
-  font-size: 16px; /* Slightly larger font for initials */
-  overflow: hidden; /* Ensures profile pic stays within bounds */
+  border-radius: 50%;
+  background-color: var(--bg-danger);
+  color: white;
+  font-weight: 600;
+  font-size: 16px;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
-.user-info .user-avatar { /* New style for the image itself */
-  width: 100%; /* Make image fill its container */
-  height: 100%; /* Make image fill its container */
-  border-radius: 50%; /* Keep image round */
-  object-fit: cover; /* Crop image to fit without distortion */
-  display: block; /* Ensure it's a block element for sizing */
+.user-info .user-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
 }
 
-.user-info .user-initial { /* New style for the initial span */
-  /* No specific width/height needed here, it will take the size of its parent .avatar */
-  text-align: center;
-}
-
-.user-info #dashboard-user-email { /* Updated selector for the email span */
+.user-info #dashboard-user-email {
   font-size: 14px;
   color: var(--text-secondary);
-  white-space: nowrap; /* Prevent email from wrapping */
-  overflow: hidden;
-  text-overflow: ellipsis; /* Add ellipsis if too long */
-  max-width: 150px; /* Adjust as needed to prevent very long emails from pushing content */
+  font-weight: 500;
+  white-space: nowrap;
   transition: color 0.3s ease;
 }
 
-/* Theme Toggle */
+/* This is the full, new styling for the animated button */
 .theme-toggle-container {
-  margin-left: 15px;
+  /* No specific styles needed here anymore, just a wrapper */
 }
 
+/*
+*
+* THE ONLY CHANGE IS IN THE BLOCK BELOW
+*
+*/
 .theme-toggle-btn {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  /* align-items: center; <-- REMOVED THIS LINE */
+  /* justify-content: center; <-- REMOVED THIS LINE */
   width: 40px;
   height: 40px;
   border: 1px solid var(--border-primary);
-  border-radius: 8px;
+  border-radius: 50%; /* Circular button */
   background: var(--bg-button);
-  color: var(--text-primary);
   cursor: pointer;
   transition: all 0.3s ease;
+  overflow: hidden; /* This is crucial for the sliding effect */
+  position: relative;
 }
 
 .theme-toggle-btn:hover {
-  background: var(--bg-button-hover);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-card);
+  border-color: var(--border-input-focus);
+  transform: rotate(15deg); /* Subtle rotation on hover */
 }
 
-.theme-icon {
-  transition: transform 0.3s ease;
+.icon-slider {
+  width: 100%;
+  /* Bouncy transition makes the animation feel great! */
+  transition: transform 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55);
 }
 
-.theme-toggle-btn:hover .theme-icon {
-  transform: scale(1.1);
+.icon-container {
+  height: 40px; /* Must match the button height */
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+
+.light-icon { color: #f59e0b; /* Sun color */ }
+.dark-icon { color: #60a5fa; /* Moon color */ }
+
+/* JS sets [data-theme], and CSS reacts to animate the slider */
+.theme-toggle-btn[data-theme="dark"] .icon-slider {
+  transform: translateY(-40px); /* Slides the moon icon up into view */
+}
+
+.theme-toggle-btn[data-theme="light"] .icon-slider {
+  transform: translateY(0); /* Slides the sun icon into view */
+}
+
+/* ======================================= */
+/* === ALL OTHER STYLES REMAIN THE SAME === */
+/* ======================================= */
 
 /* Main Content */
 main {
