@@ -64,33 +64,17 @@ class UserManager {
 
 
     async recordSummaryRequest(userId, email, fullName = null) {
-        try {
-            const user = await this.getOrCreateUser(userId, email, fullName); // Get latest user data (or create if new) + EMAIL BABY
+          try {
+            // Ensure the user exists, but we don't need to check dates here anymore.
+            await this.getOrCreateUser(userId, email, fullName);
 
-            const today = new Date();
-            today.setHours(0, 0, 0, 0); // Normalize today's date to midnight for comparison
-
-            let currentDailyCount = user.daily_summary_count;
-            let lastSummaryDate = user.last_summary_date ? new Date(user.last_summary_date) : null;
-            if (lastSummaryDate) {
-                lastSummaryDate.setHours(0, 0, 0, 0); // Normalize stored date to midnight
-            }
-
-            // Check if it's a new day since the last summary request
-            // If lastSummaryDate is null (new user) or if it's a past date
-            if (!lastSummaryDate || lastSummaryDate.getTime() < today.getTime()) {
-                console.log(`🔄 Daily count reset for user ${userId} (new day or first request).`);
-                currentDailyCount = 1; // Reset count and start with 1 for the new day
-            } else {
-                // Same day, just increment the count
-                currentDailyCount++;
-            }
-
-            // Update the database with the new count and today's date
+            // The daily reset is now fully handled by `canMakeSummaryRequest`.
+            // We can now safely just increment the count.
             const updateResult = await this.pool.query(
-                'UPDATE users SET daily_summary_count = $1, last_summary_date = CURRENT_DATE WHERE id = $2 RETURNING daily_summary_count',
-                [currentDailyCount, userId]
+                'UPDATE users SET daily_summary_count = daily_summary_count + 1 WHERE id = $1 RETURNING daily_summary_count',
+                [userId]
             );
+
 
             const newCount = updateResult.rows[0].daily_summary_count;
             console.log(`📊 Updated summary count for ${userId}: ${newCount}`);
@@ -113,29 +97,33 @@ class UserManager {
      */
     async canMakeSummaryRequest(userId, email, fullName = null, freeLimit = this.freeLimit) {
         try {
-            const user = await this.getOrCreateUser(userId, email, fullName); // Get user's current data
+            let user = await this.getOrCreateUser(userId, email, fullName);
 
-            // Pioneer users have unlimited access, always allow
             if (user.is_pioneer) {
                 console.log(`🌟 Pioneer user ${userId} - unlimited access granted`);
                 return { canProceed: true, remaining: 'Unlimited' };
             }
 
             const today = new Date();
-            today.setHours(0, 0, 0, 0); // Normalize today's date
+            today.setHours(0, 0, 0, 0);
 
-            let currentDailyCount = user.daily_summary_count;
             let lastSummaryDate = user.last_summary_date ? new Date(user.last_summary_date) : null;
             if (lastSummaryDate) {
-                lastSummaryDate.setHours(0, 0, 0, 0); // Normalize stored date
+                lastSummaryDate.setHours(0, 0, 0, 0);
             }
 
-            // IMPORTANT: For the purpose of CHECKING, if it's a new day,
-            // conceptually the count resets to 0. The actual DB reset happens in recordSummaryRequest.
+            // If it's a new day, reset the user's count to 0 in the database *now*.
             if (!lastSummaryDate || lastSummaryDate.getTime() < today.getTime()) {
-                currentDailyCount = 0; // Treat as 0 for this check, as it will be reset on first new-day request
+                console.log(`🔄 Resetting daily count for ${userId} on first check of the new day.`);
+                const result = await this.pool.query(
+                    'UPDATE users SET daily_summary_count = 0, last_summary_date = CURRENT_DATE WHERE id = $1 RETURNING *',
+                    [userId]
+                );
+                user = result.rows[0]; // Refresh the user variable with the new data (count is now 0)
             }
 
+            // *** THE FIX: Get the count *after* the potential reset. ***
+            const currentDailyCount = user.daily_summary_count;
             const remaining = freeLimit - currentDailyCount;
 
             if (remaining > 0) {
