@@ -264,6 +264,40 @@ async function authenticateWithYouTube() {
 
   } catch (error) {
     console.error('❌ Authentication error:', error);
+
+    // --- START: NEW SELF-HEALING LOGIC ---
+    // If the error was failing to fetch user info, the token might be stale.
+    // We will remove it from the cache and try ONE more time.
+    if (error.message.includes('Failed to fetch user info')) {
+        console.log('🔄 User info fetch failed. Attempting to clear cached token and retry...');
+        try {
+            // Get the token that just failed
+            const { token: badToken } = await new Promise((resolve, reject) => {
+              chrome.identity.getAuthToken({ interactive: false }, (result) => {
+                if (chrome.runtime.lastError || !result) reject(new Error('Could not get token to remove.'));
+                else resolve({token: result});
+              });
+            });
+
+            // Remove it from Chrome's cache
+            if(badToken) {
+              await new Promise((resolve, reject) => {
+                  chrome.identity.removeCachedAuthToken({ token: badToken }, resolve);
+              });
+              console.log('✅ Stale token removed from cache. Retrying authentication...');
+            }
+
+            // Now, retry the entire authentication function.
+            // We return the result of this second attempt.
+            return await authenticateWithYouTube();
+
+        } catch (retryError) {
+            console.error('❌ Retry authentication also failed:', retryError);
+            return { success: false, error: retryError.message, needsReauth: true };
+        }
+    }
+    // --- END: NEW SELF-HEALING LOGIC ---
+
     // Explicitly return needsReauth on failure during interactive authentication
     return { success: false, error: error.message, needsReauth: true }; 
   }
@@ -680,6 +714,13 @@ async function deleteVideoFromYouTube(videoId) {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('YouTube API delete error:', response.status, errorText);
+       if (response.status === 403 && errorText.includes('videoRatingDisabled')) {
+        return {
+          success: false,
+          error: 'RATINGS_DISABLED', // Send a specific error code
+          message: 'The video owner has disabled ratings for this video.'
+        };
+      }
       throw new Error(`Failed to delete video from YouTube: ${response.status}`);
     }
     
@@ -704,6 +745,7 @@ async function deleteVideoFromYouTube(videoId) {
     return {
       success: false,
       error: error.message
+      (error.error === 'RATINGS_DISABLED' && { error: 'RATINGS_DISABLED' })
     };
   }
 }

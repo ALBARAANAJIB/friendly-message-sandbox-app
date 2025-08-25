@@ -675,22 +675,40 @@ if (result.userInfo) {
     
     let deletedCount = 0;
     let failedCount = 0;
-    
+     // --- START: NEW COUNTER ---
+    let ratingsDisabledCount = 0; // Add a counter for this specific case
+    // --- END: NEW COUNTER ---
+
+        const successfullyDeletedIds = []; // Keep track of videos to remove from UI
+
     // Delete each video from YouTube
     videoIds.forEach(videoId => {
       chrome.runtime.sendMessage({ action: 'deleteVideo', videoId }, (response) => {
         if (response && response.success) {
           deletedCount++;
+          successfullyDeletedIds.push(videoId); // <-- ADD THIS LINE
         } else {
-          failedCount++;
+          // --- START: NEW FAILURE LOGIC ---
+          if (response && response.error === 'RATINGS_DISABLED') {
+            ratingsDisabledCount++; // Increment our new counter
+           } else {
+            failedCount++; // Increment generic failure for other errors
+          }
           console.error(`Failed to delete video ${videoId}:`, response?.error);
+                    // --- END: NEW FAILURE LOGIC ---
         }
-        
-        // Check if all deletions are complete
-        if (deletedCount + failedCount === totalToDelete) {
-          // Remove successfully deleted videos from local array
-          videos = videos.filter(video => !videoIds.includes(video.id) || failedCount > 0);
-          
+
+        // --- START: BUGFIX ---
+        // The check now includes all three counters to correctly determine completion.
+        if (deletedCount + failedCount + ratingsDisabledCount === totalToDelete) {
+        // --- END: BUGFIX ---
+
+        // --- START: CORRECTION ---
+          // Filter 'videos' array to remove only the ones that were successfully deleted.
+          videos = videos.filter(video => !successfullyDeletedIds.includes(video.id));
+        // --- END: CORRECTION ---
+
+      
           // Update storage
           chrome.storage.local.set({ 
             likedVideos: videos,
@@ -709,11 +727,25 @@ if (result.userInfo) {
           
           loadingElement.style.display = 'none';
           
-          if (failedCount === 0) {
-            showToast(`Successfully removed ${deletedCount} video${deletedCount !== 1 ? 's' : ''} from YouTube`);
-          } else {
-            showToast(`Removed ${deletedCount} videos, ${failedCount} failed`, 'error');
+          // --- START: ENHANCED TOAST MESSAGE ---
+          const messageParts = [];
+          if (deletedCount > 0) {
+            messageParts.push(`Successfully removed ${deletedCount} video${deletedCount > 1 ? 's' : ''}.`);
           }
+          if (ratingsDisabledCount > 0) {
+            messageParts.push(`${ratingsDisabledCount} couldn't be removed (ratings disabled).`);
+          }
+          if (failedCount > 0) {
+            messageParts.push(`${failedCount} failed for other reasons.`);
+          }
+          
+          const finalMessage = messageParts.join(' ');
+          const messageType = failedCount > 0 || ratingsDisabledCount > 0 ? 'error' : 'success';
+          
+          showToast(finalMessage, messageType);
+          // --- END: ENHANCED TOAST MESSAGE ---
+
+          
         }
       });
     });
