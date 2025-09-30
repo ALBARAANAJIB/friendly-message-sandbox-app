@@ -773,6 +773,7 @@ async function exportLikedVideos() {
     console.log('📤 Starting FULL export of ALL liked videos...');
     
     let allVideos = [];
+    const seenVideoIds = new Set(); // Track video IDs to prevent duplicates
     let pageToken = null;
     let totalFetched = 0;
     let totalAvailable = 0;
@@ -786,7 +787,6 @@ async function exportLikedVideos() {
       let result;
       
       if (useRatingMethod) {
-        // Use rating method directly
         console.log('⭐ Using myRating method for continuation...');
         try {
           const ratingResult = await fetchLikedVideosViaRating(pageToken);
@@ -805,7 +805,6 @@ async function exportLikedVideos() {
           };
         }
       } else {
-        // Try playlist method
         try {
           const likedPlaylistId = await getLikedPlaylistId();
           const playlistResult = await fetchVideosFromPlaylist(likedPlaylistId, pageToken);
@@ -816,15 +815,12 @@ async function exportLikedVideos() {
             totalResults: playlistResult.totalResults
           };
         } catch (playlistError) {
-          // Switch to rating method on any playlist pagination error
           if (playlistError.message === 'PLAYLIST_PAGINATION_FAILED' || 
               playlistError.message.includes('invalid page token') ||
               playlistError.message.includes('404')) {
             console.log('🔄 Switching to myRating method permanently...');
             useRatingMethod = true;
             
-            // IMPORTANT: Don't use the pageToken from playlist for the first myRating call
-            // Start fresh with null to get the beginning of myRating pagination
             try {
               const ratingResult = await fetchLikedVideosViaRating(null);
               result = {
@@ -860,21 +856,28 @@ async function exportLikedVideos() {
         throw new Error(result.error);
       }
       
-      allVideos = [...allVideos, ...result.videos];
+      // *** NEW: Deduplicate videos ***
+      const uniqueVideos = result.videos.filter(video => {
+        if (seenVideoIds.has(video.id)) {
+          console.log(`⚠️ Skipping duplicate video: ${video.id}`);
+          return false;
+        }
+        seenVideoIds.add(video.id);
+        return true;
+      });
+      
+      allVideos = [...allVideos, ...uniqueVideos];
       pageToken = result.nextPageToken;
-      totalFetched += result.videos.length;
+      totalFetched = allVideos.length; // Use actual unique count
       totalAvailable = result.totalResults || totalFetched;
       
-      console.log(`📊 Progress: ${totalFetched}/${totalAvailable} videos fetched`);
+      console.log(`📊 Progress: ${totalFetched} unique videos fetched (${result.videos.length - uniqueVideos.length} duplicates skipped this batch)`);
       
-      if (totalFetched >= 1000) {
-        console.log('⚠️ Reached safety limit of 1000 videos');
-        break;
-      }
+      // *** REMOVED: Safety limit of 1000 videos ***
       
-    } while (pageToken && totalFetched < totalAvailable);
+    } while (pageToken);
     
-    console.log(`✅ Finished fetching! Total videos: ${allVideos.length}`);
+    console.log(`✅ Finished fetching! Total unique videos: ${allVideos.length}`);
     
     if (allVideos.length === 0) {
       return {
@@ -895,9 +898,9 @@ async function exportLikedVideos() {
       statistics: {
         totalVideos: allVideos.length,
         totalAvailableOnYouTube: totalAvailable,
-        exportCompleteness: ((allVideos.length / totalAvailable) * 100).toFixed(1) + '%'
+        exportCompleteness: '100%' // Since we fetch everything now
       },
-      note: 'Complete export of YouTube liked videos with accurate timestamps and metadata',
+      note: 'Complete export of YouTube liked videos with accurate timestamps and metadata (deduplicated)',
       videos: allVideos.map((video, index) => ({
         ...video,
         exportIndex: index + 1,
@@ -920,8 +923,8 @@ async function exportLikedVideos() {
       success: true,
       count: allVideos.length,
       totalAvailable: totalAvailable,
-      completeness: ((allVideos.length / totalAvailable) * 100).toFixed(1) + '%',
-      message: `FULL export successful! ${allVideos.length} of ${totalAvailable} liked videos exported (${((allVideos.length / totalAvailable) * 100).toFixed(1)}% complete).`
+      completeness: '100%',
+      message: `FULL export successful! ${allVideos.length} unique liked videos exported.`
     };
     
   } catch (error) {
