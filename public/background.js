@@ -418,7 +418,244 @@ async function getLikedPlaylistId() {
   }
 }
 
-// UPDATED: Enhanced fetch with automatic token refresh
+
+// UPDATED: Helper functions with new authentication
+// UPDATED: Helper function with 404 pagination fix
+async function fetchVideosFromPlaylist(playlistId, pageToken = null) {
+  console.log('📋 Fetching from playlist:', playlistId, pageToken ? `page: ${pageToken}` : 'first page');
+  
+  let url = `${PLAYLIST_ITEMS_ENDPOINT}?part=snippet,contentDetails&playlistId=${playlistId}&maxResults=50`;
+  if (pageToken) {
+    url += `&pageToken=${pageToken}`;
+  }
+  
+  const playlistResponse = await makeAuthenticatedRequest(url);
+  
+  if (!playlistResponse.ok) {
+    const errorText = await playlistResponse.text();
+    console.error('Playlist API error:', playlistResponse.status, errorText);
+    
+    // *** FIX: Detect 404 errors during pagination and trigger fallback ***
+    if (playlistResponse.status === 404) {
+      console.log('⚠️ Playlist 404 during pagination - this is a YouTube API limitation for large playlists');
+      // Throw a specific error that will trigger the fallback mechanism
+      throw new Error('PLAYLIST_PAGINATION_FAILED');
+    }
+    
+    throw new Error(`Failed to fetch liked videos playlist: ${playlistResponse.status} - ${errorText}`);
+  }
+  
+  const playlistData = await playlistResponse.json();
+  console.log('📋 Playlist data:', playlistData);
+  
+  if (!playlistData.items || playlistData.items.length === 0) {
+    console.log('📋 Playlist is empty or no items returned');
+    return {
+      videos: [],
+      nextPageToken: null,
+      totalResults: playlistData.pageInfo?.totalResults || 0
+    };
+  }
+  
+  // Extract video IDs and get detailed information
+  const videoIds = playlistData.items.map(item => item.contentDetails.videoId).join(',');
+  console.log('🆔 Video IDs to fetch:', videoIds);
+  
+  const videosResponse = await makeAuthenticatedRequest(
+    `${VIDEOS_ENDPOINT}?part=snippet,statistics,contentDetails&id=${videoIds}`
+  );
+  
+  if (!videosResponse.ok) {
+    const errorText = await videosResponse.text();
+    console.error('Videos API error:', videosResponse.status, errorText);
+    throw new Error(`Failed to fetch video details: ${videosResponse.status}`);
+  }
+  
+  const videosData = await videosResponse.json();
+  console.log('📹 Videos data:', videosData);
+  
+  // Process videos
+  const videos = playlistData.items.map(playlistItem => {
+    const videoDetails = videosData.items.find(video => video.id === playlistItem.contentDetails.videoId);
+    
+    if (!videoDetails) {
+      console.warn('⚠️ Video details not found for:', playlistItem.contentDetails.videoId);
+      return null;
+    }
+    
+    return {
+      id: videoDetails.id,
+      title: videoDetails.snippet.title,
+      channelTitle: videoDetails.snippet.channelTitle,
+      channelId: videoDetails.snippet.channelId,
+      publishedAt: videoDetails.snippet.publishedAt,
+      likedAt: playlistItem.snippet.publishedAt,
+      thumbnail: videoDetails.snippet.thumbnails.medium?.url || videoDetails.snippet.thumbnails.default?.url || '',
+      viewCount: videoDetails.statistics?.viewCount || '0',
+      likeCount: videoDetails.statistics?.likeCount || '0',
+      duration: videoDetails.contentDetails?.duration || '',
+      url: `https://www.youtube.com/watch?v=${videoDetails.id}`
+    };
+  }).filter(video => video !== null);
+  
+  console.log(`✅ Processed ${videos.length} videos from playlist`);
+  
+  return {
+    videos: videos,
+    nextPageToken: playlistData.nextPageToken || null,
+    totalResults: playlistData.pageInfo?.totalResults || videos.length
+  };
+}
+
+// Add this function after fetchVideosFromPlaylist and before exportLikedVideos
+async function fetchLikedVideosViaRating(pageToken = null) {
+  console.log('⭐ Attempting to find liked videos via myRating parameter...', pageToken ? `page: ${pageToken}` : 'first page');
+  
+  let url = `${VIDEOS_ENDPOINT}?part=snippet,statistics,contentDetails&myRating=like&maxResults=50`;
+  if (pageToken) {
+    url += `&pageToken=${pageToken}`;
+  }
+  
+  const response = await makeAuthenticatedRequest(url);
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('MyRating API error:', response.status, errorText);
+    throw new Error(`Failed to fetch liked videos via rating: ${response.status} - ${errorText}`);
+  }
+  
+  const data = await response.json();
+  console.log('⭐ MyRating response:', data);
+  
+  if (!data.items || data.items.length === 0) {
+    return {
+      videos: [],
+      nextPageToken: null,
+      totalResults: data.pageInfo?.totalResults || 0
+    };
+  }
+  
+  const videos = data.items.map(video => ({
+    id: video.id,
+    title: video.snippet.title,
+    channelTitle: video.snippet.channelTitle,
+    channelId: video.snippet.channelId,
+    publishedAt: video.snippet.publishedAt,
+    likedAt: video.snippet.publishedAt,
+    thumbnail: video.snippet.thumbnails.medium?.url || video.snippet.thumbnails.default?.url || '',
+    viewCount: video.statistics?.viewCount || '0',
+    likeCount: video.statistics?.likeCount || '0',
+    duration: video.contentDetails?.duration || '',
+    url: `https://www.youtube.com/watch?v=${video.id}`
+  }));
+  
+  console.log(`⭐ Found ${videos.length} videos via myRating approach`);
+  
+  return {
+    videos: videos,
+    nextPageToken: data.nextPageToken || null,
+    totalResults: data.pageInfo?.totalResults || videos.length
+  };
+}
+
+// Also add this function for fetchMoreLikedVideos if it's missing
+async function fetchMoreLikedVideos(pageToken) {
+  console.log('📺 Fetching more liked videos with pageToken:', pageToken);
+  
+  if (!pageToken) {
+    return {
+      success: false,
+      error: 'No page token provided for pagination'
+    };
+  }
+  
+  try {
+    const result = await fetchLikedVideos(pageToken);
+    
+    if (result.success) {
+      const storage = await chrome.storage.local.get(['likedVideos', 'totalResults']);
+      const currentVideos = storage.likedVideos || [];
+      const allVideos = [...currentVideos, ...result.videos];
+      
+      await chrome.storage.local.set({
+        likedVideos: allVideos,
+        nextPageToken: result.nextPageToken,
+        totalResults: result.totalResults
+      });
+      
+      return {
+        success: true,
+        videos: result.videos,
+        allVideos: allVideos,
+        count: result.videos.length,
+        totalCount: allVideos.length,
+        nextPageToken: result.nextPageToken,
+        totalResults: result.totalResults
+      };
+    }
+    
+    return result;
+    
+  } catch (error) {
+    console.error('❌ Error fetching more videos:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+async function deleteVideoFromYouTube(videoId) {
+  try {
+    console.log('🗑️ Deleting video from YouTube:', videoId);
+    
+    const response = await makeAuthenticatedRequest(`${API_BASE}/videos/rate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: `id=${videoId}&rating=none`
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('YouTube API delete error:', response.status, errorText);
+       if (response.status === 403 && errorText.includes('videoRatingDisabled')) {
+        return {
+          success: false,
+          error: 'RATINGS_DISABLED',
+          message: 'The video owner has disabled ratings for this video.'
+        };
+      }
+      throw new Error(`Failed to delete video from YouTube: ${response.status}`);
+    }
+    
+    console.log('✅ Video successfully removed from YouTube liked list');
+    
+    return {
+      success: true,
+      message: 'Video removed from YouTube liked list'
+    };
+    
+  } catch (error) {
+    console.error('❌ Error deleting video from YouTube:', error);
+    
+    if (error.message === 'NEEDS_REAUTH') {
+      return {
+        success: false,
+        error: 'Authentication expired. Please sign in again.',
+        needsReauth: true
+      };
+    }
+    
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+// UPDATED: Enhanced fetch with 404 pagination fallback
 async function fetchLikedVideos(pageToken = null) {
   try {
     console.log('📺 Starting liked videos fetch process...', pageToken ? `with pageToken: ${pageToken}` : 'initial fetch');
@@ -446,8 +683,16 @@ async function fetchLikedVideos(pageToken = null) {
         };
       }
       
-      // Try alternative approach
-      if (['CHANNEL_ACCESS_DENIED', 'NO_CHANNEL_FOUND', 'NO_RELATED_PLAYLISTS', 'NO_LIKED_PLAYLIST', 'PLAYLIST_ACCESS_DENIED'].includes(playlistError.message)) {
+      // *** FIX: Add PLAYLIST_PAGINATION_FAILED to the fallback triggers ***
+      // Try alternative approach for all known playlist issues
+      if ([
+        'CHANNEL_ACCESS_DENIED', 
+        'NO_CHANNEL_FOUND', 
+        'NO_RELATED_PLAYLISTS', 
+        'NO_LIKED_PLAYLIST', 
+        'PLAYLIST_ACCESS_DENIED',
+        'PLAYLIST_PAGINATION_FAILED'  // *** NEW: Handle 404 pagination errors ***
+      ].includes(playlistError.message)) {
         try {
           console.log('🔄 Trying myRating approach...');
           const result = await fetchLikedVideosViaRating(pageToken);
@@ -523,233 +768,6 @@ async function fetchLikedVideos(pageToken = null) {
   }
 }
 
-// UPDATED: Helper functions with new authentication
-async function fetchVideosFromPlaylist(playlistId, pageToken = null) {
-  console.log('📋 Fetching from playlist:', playlistId, pageToken ? `page: ${pageToken}` : 'first page');
-  
-  let url = `${PLAYLIST_ITEMS_ENDPOINT}?part=snippet,contentDetails&playlistId=${playlistId}&maxResults=50`;
-  if (pageToken) {
-    url += `&pageToken=${pageToken}`;
-  }
-  
-  const playlistResponse = await makeAuthenticatedRequest(url);
-  
-  if (!playlistResponse.ok) {
-    const errorText = await playlistResponse.text();
-    console.error('Playlist API error:', playlistResponse.status, errorText);
-    throw new Error(`Failed to fetch liked videos playlist: ${playlistResponse.status} - ${errorText}`);
-  }
-  
-  const playlistData = await playlistResponse.json();
-  console.log('📋 Playlist data:', playlistData);
-  
-  if (!playlistData.items || playlistData.items.length === 0) {
-    console.log('📋 Playlist is empty or no items returned');
-    return {
-      videos: [],
-      nextPageToken: null,
-      totalResults: playlistData.pageInfo?.totalResults || 0
-    };
-  }
-  
-  // Extract video IDs and get detailed information
-  const videoIds = playlistData.items.map(item => item.contentDetails.videoId).join(',');
-  console.log('🆔 Video IDs to fetch:', videoIds);
-  
-  const videosResponse = await makeAuthenticatedRequest(
-    `${VIDEOS_ENDPOINT}?part=snippet,statistics,contentDetails&id=${videoIds}`
-  );
-  
-  if (!videosResponse.ok) {
-    const errorText = await videosResponse.text();
-    console.error('Videos API error:', videosResponse.status, errorText);
-    throw new Error(`Failed to fetch video details: ${videosResponse.status}`);
-  }
-  
-  const videosData = await videosResponse.json();
-  console.log('📹 Videos data:', videosData);
-  
-  // Process videos
-  const videos = playlistData.items.map(playlistItem => {
-    const videoDetails = videosData.items.find(video => video.id === playlistItem.contentDetails.videoId);
-    
-    if (!videoDetails) {
-      console.warn('⚠️ Video details not found for:', playlistItem.contentDetails.videoId);
-      return null;
-    }
-    
-    return {
-      id: videoDetails.id,
-      title: videoDetails.snippet.title,
-      channelTitle: videoDetails.snippet.channelTitle,
-      channelId: videoDetails.snippet.channelId,
-      publishedAt: videoDetails.snippet.publishedAt,
-      likedAt: playlistItem.snippet.publishedAt,
-      thumbnail: videoDetails.snippet.thumbnails.medium?.url || videoDetails.snippet.thumbnails.default?.url || '',
-      viewCount: videoDetails.statistics?.viewCount || '0',
-      likeCount: videoDetails.statistics?.likeCount || '0',
-      duration: videoDetails.contentDetails?.duration || '',
-      url: `https://www.youtube.com/watch?v=${videoDetails.id}`
-    };
-  }).filter(video => video !== null);
-  
-  console.log(`✅ Processed ${videos.length} videos from playlist`);
-  
-  return {
-    videos: videos,
-    nextPageToken: playlistData.nextPageToken || null,
-    totalResults: playlistData.pageInfo?.totalResults || videos.length
-  };
-}
-
-async function fetchLikedVideosViaRating(pageToken = null) {
-  console.log('⭐ Attempting to find liked videos via myRating parameter...', pageToken ? `page: ${pageToken}` : 'first page');
-  
-  let url = `${VIDEOS_ENDPOINT}?part=snippet,statistics,contentDetails&myRating=like&maxResults=50`;
-  if (pageToken) {
-    url += `&pageToken=${pageToken}`;
-  }
-  
-  const response = await makeAuthenticatedRequest(url);
-  
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('MyRating API error:', response.status, errorText);
-    throw new Error(`Failed to fetch liked videos via rating: ${response.status} - ${errorText}`);
-  }
-  
-  const data = await response.json();
-  console.log('⭐ MyRating response:', data);
-  
-  if (!data.items || data.items.length === 0) {
-    return {
-      videos: [],
-      nextPageToken: null,
-      totalResults: data.pageInfo?.totalResults || 0
-    };
-  }
-  
-  const videos = data.items.map(video => ({
-    id: video.id,
-    title: video.snippet.title,
-    channelTitle: video.snippet.channelTitle,
-    channelId: video.snippet.channelId,
-    publishedAt: video.snippet.publishedAt,
-    likedAt: video.snippet.publishedAt,
-    thumbnail: video.snippet.thumbnails.medium?.url || video.snippet.thumbnails.default?.url || '',
-    viewCount: video.statistics?.viewCount || '0',
-    likeCount: video.statistics?.likeCount || '0',
-    duration: video.contentDetails?.duration || '',
-    url: `https://www.youtube.com/watch?v=${video.id}`
-  }));
-  
-  console.log(`⭐ Found ${videos.length} videos via myRating approach`);
-  
-  return {
-    videos: videos,
-    nextPageToken: data.nextPageToken || null,
-    totalResults: data.pageInfo?.totalResults || videos.length
-  };
-}
-
-// UPDATED: All other functions with authentication handling
-async function fetchMoreLikedVideos(pageToken) {
-  console.log('📺 Fetching more liked videos with pageToken:', pageToken);
-  
-  if (!pageToken) {
-    return {
-      success: false,
-      error: 'No page token provided for pagination'
-    };
-  }
-  
-  try {
-    const result = await fetchLikedVideos(pageToken);
-    
-    if (result.success) {
-      const storage = await chrome.storage.local.get(['likedVideos', 'totalResults']);
-      const currentVideos = storage.likedVideos || [];
-      const allVideos = [...currentVideos, ...result.videos];
-      
-      await chrome.storage.local.set({
-        likedVideos: allVideos,
-        nextPageToken: result.nextPageToken,
-        totalResults: result.totalResults
-      });
-      
-      return {
-        success: true,
-        videos: result.videos,
-        allVideos: allVideos,
-        count: result.videos.length,
-        totalCount: allVideos.length,
-        nextPageToken: result.nextPageToken,
-        totalResults: result.totalResults
-      };
-    }
-    
-    return result;
-    
-  } catch (error) {
-    console.error('❌ Error fetching more videos:', error);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-}
-
-async function deleteVideoFromYouTube(videoId) {
-  try {
-    console.log('🗑️ Deleting video from YouTube:', videoId);
-    
-    const response = await makeAuthenticatedRequest(`${API_BASE}/videos/rate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: `id=${videoId}&rating=none`
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('YouTube API delete error:', response.status, errorText);
-       if (response.status === 403 && errorText.includes('videoRatingDisabled')) {
-        return {
-          success: false,
-          error: 'RATINGS_DISABLED', // Send a specific error code
-          message: 'The video owner has disabled ratings for this video.'
-        };
-      }
-      throw new Error(`Failed to delete video from YouTube: ${response.status}`);
-    }
-    
-    console.log('✅ Video successfully removed from YouTube liked list');
-    
-    return {
-      success: true,
-      message: 'Video removed from YouTube liked list'
-    };
-    
-  } catch (error) {
-    console.error('❌ Error deleting video from YouTube:', error);
-    
-    if (error.message === 'NEEDS_REAUTH') {
-      return {
-        success: false,
-        error: 'Authentication expired. Please sign in again.',
-        needsReauth: true
-      };
-    }
-    
-    return {
-      success: false,
-      error: error.message
-      (error.error === 'RATINGS_DISABLED' && { error: 'RATINGS_DISABLED' })
-    };
-  }
-}
-
 async function exportLikedVideos() {
   try {
     console.log('📤 Starting FULL export of ALL liked videos...');
@@ -758,13 +776,82 @@ async function exportLikedVideos() {
     let pageToken = null;
     let totalFetched = 0;
     let totalAvailable = 0;
+    let useRatingMethod = false;
     
     console.log('🔄 Fetching ALL liked videos for export...');
     
     do {
       console.log(`📥 Fetching page ${pageToken ? `(${pageToken})` : '1'}...`);
       
-      const result = await fetchLikedVideos(pageToken);
+      let result;
+      
+      if (useRatingMethod) {
+        // Use rating method directly
+        console.log('⭐ Using myRating method for continuation...');
+        try {
+          const ratingResult = await fetchLikedVideosViaRating(pageToken);
+          result = {
+            success: true,
+            videos: ratingResult.videos,
+            nextPageToken: ratingResult.nextPageToken,
+            totalResults: ratingResult.totalResults
+          };
+        } catch (error) {
+          console.error('❌ Rating method failed:', error);
+          result = {
+            success: false,
+            error: error.message,
+            needsReauth: error.message === 'NEEDS_REAUTH'
+          };
+        }
+      } else {
+        // Try playlist method
+        try {
+          const likedPlaylistId = await getLikedPlaylistId();
+          const playlistResult = await fetchVideosFromPlaylist(likedPlaylistId, pageToken);
+          result = {
+            success: true,
+            videos: playlistResult.videos,
+            nextPageToken: playlistResult.nextPageToken,
+            totalResults: playlistResult.totalResults
+          };
+        } catch (playlistError) {
+          // Switch to rating method on any playlist pagination error
+          if (playlistError.message === 'PLAYLIST_PAGINATION_FAILED' || 
+              playlistError.message.includes('invalid page token') ||
+              playlistError.message.includes('404')) {
+            console.log('🔄 Switching to myRating method permanently...');
+            useRatingMethod = true;
+            
+            // IMPORTANT: Don't use the pageToken from playlist for the first myRating call
+            // Start fresh with null to get the beginning of myRating pagination
+            try {
+              const ratingResult = await fetchLikedVideosViaRating(null);
+              result = {
+                success: true,
+                videos: ratingResult.videos,
+                nextPageToken: ratingResult.nextPageToken,
+                totalResults: ratingResult.totalResults
+              };
+            } catch (ratingError) {
+              console.error('❌ Rating method also failed:', ratingError);
+              result = {
+                success: false,
+                error: ratingError.message,
+                needsReauth: ratingError.message === 'NEEDS_REAUTH'
+              };
+            }
+          } else if (playlistError.message === 'NEEDS_REAUTH') {
+            result = {
+              success: false,
+              error: 'Authentication expired. Please sign in again.',
+              needsReauth: true
+            };
+          } else {
+            throw playlistError;
+          }
+        }
+      }
       
       if (!result.success) {
         if (result.needsReauth) {
@@ -854,7 +941,6 @@ async function exportLikedVideos() {
     };
   }
 }
-
 // NEW: Check authentication status on startup
 async function checkAuthOnStartup() {
   try {
