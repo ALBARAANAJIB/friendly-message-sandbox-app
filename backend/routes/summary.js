@@ -148,15 +148,16 @@ module.exports = (pool) => {
             const langCode = languageCodeMap[summaryLanguage] || 'en'; // Default to 'en'
             // END: Language mapping
 
-            const pythonScriptPath = path.join(__dirname, '..', 'scripts', 'script.py');
+const pythonScriptPath = path.join(__dirname, '..', 'scripts', 'script.py');
 
-// Check if virtual environment exists, otherwise use system python
+// Use system python in production (Render), venv in development
+const isProduction = process.env.NODE_ENV === 'production';
 const localVenvPath = process.platform === 'win32'
     ? path.join(__dirname, '..', 'scripts', 'transcript-env', 'Scripts', 'python.exe')
     : path.join(__dirname, '..', 'scripts', 'transcript-env', 'bin', 'python3');
 
-const pythonInterpreter = fs.existsSync(localVenvPath) ? localVenvPath : 'python3';
-console.log(`Using Python interpreter: ${pythonInterpreter}`);
+const pythonInterpreter = isProduction ? 'python3' : (fs.existsSync(localVenvPath) ? localVenvPath : 'python3');
+console.log(`Using Python interpreter: ${pythonInterpreter} (production: ${isProduction})`);
 
             let transcriptData = '';
             let pythonError = '';
