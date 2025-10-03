@@ -24,7 +24,7 @@ if (window.youtubeEnhancerLoaded) {
     }
   }, 300);
 
-  const API_BASE_URL = 'https://friendly-message-sandbox-app.onrender.com';
+  const API_BASE_URL = 'https://friendly-message-sandbox-app.onrender.com/api';
 
   // --- Core Logic ---
   let isInjecting = false;
