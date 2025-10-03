@@ -1,4 +1,5 @@
 // File: backend/routes/summary.js
+const fs = require('fs'); // Add this at the top of the file with other requires
 
 const express = require('express');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
@@ -148,9 +149,14 @@ module.exports = (pool) => {
             // END: Language mapping
 
             const pythonScriptPath = path.join(__dirname, '..', 'scripts', 'script.py');
-            const pythonInterpreter = process.platform === 'win32'
-                ? path.join(__dirname, '..', 'scripts', 'transcript-env', 'Scripts', 'python.exe')
-                : path.join(__dirname, '..', 'scripts', 'transcript-env', 'bin', 'python3');
+
+// Check if virtual environment exists, otherwise use system python
+const localVenvPath = process.platform === 'win32'
+    ? path.join(__dirname, '..', 'scripts', 'transcript-env', 'Scripts', 'python.exe')
+    : path.join(__dirname, '..', 'scripts', 'transcript-env', 'bin', 'python3');
+
+const pythonInterpreter = fs.existsSync(localVenvPath) ? localVenvPath : 'python3';
+console.log(`Using Python interpreter: ${pythonInterpreter}`);
 
             let transcriptData = '';
             let pythonError = '';
